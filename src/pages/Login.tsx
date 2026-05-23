@@ -18,6 +18,20 @@ const Login = () => {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
 
+  const quickLogin = async (demoEmail: string, demoPassword: string) => {
+    setError("");
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    setLoading(true);
+    try {
+      const { error } = await login(demoEmail, demoPassword);
+      if (error) { setError(error); return; }
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -106,6 +120,24 @@ const Login = () => {
               {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"} <ArrowRight size={18} />
             </Button>
           </form>
+
+          {!isSignUp && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick Login</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button type="button" variant="outline" disabled={loading} onClick={() => quickLogin("admin@gmail.com", "admin123")} className="h-11">
+                  Admin
+                </Button>
+                <Button type="button" variant="outline" disabled={loading} onClick={() => quickLogin("user@gmail.com", "user123")} className="h-11">
+                  User
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="text-center">
             <button
