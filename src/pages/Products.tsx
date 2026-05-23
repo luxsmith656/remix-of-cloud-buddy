@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { logAuditAction } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
+import { uploadCompressedImage, ACCEPT_ATTR } from "@/lib/imageUpload";
 
 type Product = Tables<"products">;
 
