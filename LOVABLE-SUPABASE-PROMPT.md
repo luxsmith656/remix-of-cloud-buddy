@@ -14,8 +14,10 @@ Apply all SQL migration files in order from the repo:
 3. supabase/migrations/20260523041855_43406f70-7f1c-4a17-a8e3-235217ebb35a.sql
 4. supabase/migrations/20260527120000_harden_inventory_transactions.sql
 5. supabase/migrations/20260527133000_operations_hardening.sql
-6. supabase/migrations/20260527150000_grant_has_role_execute.sql
-7. supabase/migrations/20260527170000_real_life_inventory_flows.sql
+6. supabase/migrations/20260527141545_7ddf89f0-86c8-4c9e-9203-43c8b0402080.sql
+7. supabase/migrations/20260527143201_e504c6df-ebaa-4b48-a6e6-97b23938021d.sql
+8. supabase/migrations/20260527150000_grant_has_role_execute.sql
+9. supabase/migrations/20260527170000_real_life_inventory_flows.sql
 
 Important requirements:
 - Preserve existing data.
@@ -25,6 +27,8 @@ Important requirements:
 - Add request_inventory_adjustment and review_inventory_adjustment RPCs.
 - Add set_user_role RPC for admin role management.
 - Add refresh_inventory_alerts RPC.
+- Make stock_movements append-only.
+- Add save_recipe RPC so recipe header and ingredient rows are saved atomically.
 - Grant authenticated users EXECUTE access on has_role(uuid, app_role), because the frontend and policies need this helper to resolve admin/user access.
 - Add ingredient_receipts, product_dispatches, and inventory_activity tables.
 - Add unit_cost to ingredients and unit_price/estimated_unit_cost to products.
@@ -57,6 +61,7 @@ Then test these workflows:
 - Reports export inventory, receiving, dispatch, batch, usage, and defect data safely to CSV/PDF.
 - Batch production works through produce_batch.
 - Defect logging works through log_defect.
+- Recipe create/edit works through save_recipe and does not leave partial recipe ingredient rows.
 - Image upload rejects SVG and accepts PNG/JPG/WEBP.
 - Refresh Alerts creates low-stock and expiration alerts.
 ```
