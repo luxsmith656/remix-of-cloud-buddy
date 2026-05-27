@@ -55,6 +55,8 @@ The operations hardening migration adds:
 - Immutable audit-log protection.
 - Manual alert refresh for low-stock and expiration notifications.
 
+The role helper grant migration allows signed-in clients to call `has_role(uuid, app_role)`, which the frontend uses to resolve admin access and which RLS/storage policies rely on.
+
 If you use Lovable for Supabase changes, paste the prompt in `LOVABLE-SUPABASE-PROMPT.md`.
 
 ## Admin Account Setup

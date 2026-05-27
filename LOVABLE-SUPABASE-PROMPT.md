@@ -14,6 +14,7 @@ Apply all SQL migration files in order from the repo:
 3. supabase/migrations/20260523041855_43406f70-7f1c-4a17-a8e3-235217ebb35a.sql
 4. supabase/migrations/20260527120000_harden_inventory_transactions.sql
 5. supabase/migrations/20260527133000_operations_hardening.sql
+6. supabase/migrations/20260527150000_grant_has_role_execute.sql
 
 Important requirements:
 - Preserve existing data.
@@ -23,6 +24,7 @@ Important requirements:
 - Add request_inventory_adjustment and review_inventory_adjustment RPCs.
 - Add set_user_role RPC for admin role management.
 - Add refresh_inventory_alerts RPC.
+- Grant authenticated users EXECUTE access on has_role(uuid, app_role), because the frontend and policies need this helper to resolve admin/user access.
 - Keep audit_logs immutable with the new trigger.
 - Keep batch production and defect logging atomic through produce_batch and log_defect.
 - Harden the images storage bucket: public read, admin-only upload/update/delete, PNG/JPG/WEBP only, 5 MB limit.
