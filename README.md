@@ -2,6 +2,8 @@
 
 Cloud Buddy is a React, Vite, TypeScript, Tailwind, shadcn/ui, and Supabase inventory management app for products, ingredients, suppliers, recipes, ingredient receiving, batch production, product dispatch, defects, stock movements, adjustment approvals, alerts, reports, activity history, roles, and audit logs.
 
+<!-- GitHub sync verification: 2026-05-28 -->
+
 ## Prerequisites
 
 - Node.js 20 or newer
