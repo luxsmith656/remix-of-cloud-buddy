@@ -145,3 +145,5 @@ If the Vercel site still shows missing configuration or "configuration required,
 - Camera scanning depends on browser support for the BarcodeDetector API. USB scanners and manual barcode search are supported as fallback paths.
 - Batch-level FEFO allocation is possible through dispatch batch selection, but automatic FEFO picking is still a recommended improvement.
 - Broader import/export workflows, backup automation, external monitoring, scheduled alert jobs, email/SMS notifications, barcode hardware testing, audit dashboards, and approval workflows for high-value dispatches are recommended next improvements.
+
+<!-- force-test-push: 2026-05-28T12:39:06Z -->
