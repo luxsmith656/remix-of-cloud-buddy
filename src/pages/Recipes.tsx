@@ -76,12 +76,12 @@ const Recipes = () => {
       }
       const ingredientsPayload = recipeIngredients.map(({ ingredient_id, quantity }) => ({ ingredient_id, quantity })) as unknown as Json;
       const { error } = await supabase.rpc("save_recipe", {
-        recipe_id_value: editingId ?? undefined,
+        recipe_id_value: editingId,
         product_id_value: selectedProduct,
-        name_value: recipeName.trim() || undefined,
-        image_url_value: recipeImage || undefined,
+        name_value: recipeName.trim() || null,
+        image_url_value: recipeImage || null,
         ingredients_value: ingredientsPayload,
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: (_, __, context) => {
