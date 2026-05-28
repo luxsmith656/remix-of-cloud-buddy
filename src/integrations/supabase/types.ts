@@ -709,6 +709,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_recipe: { Args: { recipe_id_value: string }; Returns: undefined }
       dispatch_product: {
         Args: {
           batch_id_value?: string
