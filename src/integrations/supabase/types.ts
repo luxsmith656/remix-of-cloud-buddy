@@ -711,15 +711,15 @@ export type Database = {
       }
       dispatch_product: {
         Args: {
-          batch_id_value?: string
-          destination_value?: string
+          batch_id_value?: string | null
+          destination_value?: string | null
           dispatch_type_value?: string
-          dispatched_date_value?: string
-          notes_value?: string
+          dispatched_date_value?: string | null
+          notes_value?: string | null
           product_id_value: string
           quantity_value: number
-          reference_number_value?: string
-          unit_price_value?: number
+          reference_number_value?: string | null
+          unit_price_value?: number | null
         }
         Returns: string
       }
@@ -765,7 +765,7 @@ export type Database = {
       normalize_batch_token: { Args: { value: string }; Returns: string }
       produce_batch: {
         Args: {
-          batch_code_value?: string
+          batch_code_value?: string | null
           expiration_date_value: string
           product_id_value: string
           production_date_value?: string
@@ -776,15 +776,15 @@ export type Database = {
       product_code: { Args: { value: string }; Returns: string }
       receive_ingredient: {
         Args: {
-          expiration_date_value?: string
+          expiration_date_value?: string | null
           ingredient_id_value: string
-          invoice_number_value?: string
-          lot_number_value?: string
-          notes_value?: string
+          invoice_number_value?: string | null
+          lot_number_value?: string | null
+          notes_value?: string | null
           quantity_value: number
-          received_date_value?: string
-          supplier_id_value?: string
-          unit_cost_value?: number
+          received_date_value?: string | null
+          supplier_id_value?: string | null
+          unit_cost_value?: number | null
         }
         Returns: string
       }
@@ -802,19 +802,23 @@ export type Database = {
         Args: {
           approve_value: boolean
           request_id_value: string
-          review_note_value?: string
+          review_note_value?: string | null
         }
         Returns: undefined
       }
       save_recipe: {
         Args: {
-          image_url_value: string
+          image_url_value: string | null
           ingredients_value: Json
-          name_value: string
+          name_value: string | null
           product_id_value: string
-          recipe_id_value: string
+          recipe_id_value: string | null
         }
         Returns: string
+      }
+      delete_recipe: {
+        Args: { recipe_id_value: string }
+        Returns: undefined
       }
       set_user_role: {
         Args: {

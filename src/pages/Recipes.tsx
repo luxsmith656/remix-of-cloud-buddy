@@ -67,12 +67,19 @@ const Recipes = () => {
     mutationFn: async () => {
       if (!selectedProduct) throw new Error("Select a product");
       if (!recipeIngredients.length) throw new Error("Add at least one ingredient");
+      if (recipeIngredients.some((ingredient) => !ingredient.ingredient_id || ingredient.quantity <= 0)) {
+        throw new Error("Each ingredient needs a selected item and a quantity greater than zero");
+      }
+      const ingredientIds = recipeIngredients.map((ingredient) => ingredient.ingredient_id);
+      if (new Set(ingredientIds).size !== ingredientIds.length) {
+        throw new Error("Each ingredient can only appear once in a recipe");
+      }
       const ingredientsPayload = recipeIngredients.map(({ ingredient_id, quantity }) => ({ ingredient_id, quantity })) as unknown as Json;
       const { error } = await supabase.rpc("save_recipe", {
-        recipe_id_value: (editingId ?? undefined) as string,
+        recipe_id_value: editingId,
         product_id_value: selectedProduct,
-        name_value: recipeName || "",
-        image_url_value: recipeImage || "",
+        name_value: recipeName.trim() || null,
+        image_url_value: recipeImage || null,
         ingredients_value: ingredientsPayload,
       });
       if (error) throw error;
@@ -92,8 +99,7 @@ const Recipes = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("recipe_ingredients").delete().eq("recipe_id", id);
-      const { error } = await supabase.from("recipes").delete().eq("id", id);
+      const { error } = await supabase.rpc("delete_recipe", { recipe_id_value: id });
       if (error) throw error;
     },
     onSuccess: (_, deletedId) => {

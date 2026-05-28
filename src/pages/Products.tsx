@@ -82,7 +82,8 @@ const Products = () => {
   const upsertMutation = useMutation({
     mutationFn: async (p: TablesInsert<"products"> & { id?: string }) => {
       if (p.id) {
-        const { error } = await supabase.from("products").update(p).eq("id", p.id);
+        const { id, ...payload } = p;
+        const { error } = await supabase.from("products").update(payload).eq("id", id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("products").insert(p);
@@ -106,6 +107,15 @@ const Products = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      const [{ data: linkedBatches, error: batchesError }, { data: linkedRecipes, error: recipesError }, { data: linkedDispatches, error: dispatchesError }] = await Promise.all([
+        supabase.from("batches").select("id").eq("product_id", id).limit(1),
+        supabase.from("recipes").select("id").eq("product_id", id).limit(1),
+        supabase.from("product_dispatches").select("id").eq("product_id", id).limit(1),
+      ]);
+      if (batchesError || recipesError || dispatchesError) throw batchesError || recipesError || dispatchesError;
+      if (linkedBatches?.length || linkedRecipes?.length || linkedDispatches?.length) {
+        throw new Error("This product has batches, recipes, or dispatch history. Keep it for records instead of deleting it.");
+      }
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
     },

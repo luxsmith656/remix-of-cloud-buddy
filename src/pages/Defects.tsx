@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,13 +33,25 @@ const Defects = () => {
 
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
-    queryFn: async () => { const { data } = await supabase.from("batches").select("*, products(name, variant)"); return data || []; },
+    queryFn: async () => {
+      const { data, error } = await supabase.from("batches").select("*, products(name, variant)");
+      if (error) throw error;
+      return data || [];
+    },
   });
+
+  const selectedBatch = useMemo(
+    () => batches.find((batch: any) => batch.id === batchId),
+    [batchId, batches],
+  );
 
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!batchId) throw new Error("Select a batch");
       if (quantity < 1) throw new Error("Quantity must be at least 1");
+      if (selectedBatch && quantity > selectedBatch.quantity_produced) {
+        throw new Error("Defect quantity cannot exceed remaining batch stock");
+      }
       const { error } = await supabase.rpc("log_defect", {
         batch_id_value: batchId,
         quantity_value: quantity,

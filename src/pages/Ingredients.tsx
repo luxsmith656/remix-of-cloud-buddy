@@ -73,6 +73,14 @@ const Ingredients = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      const [{ data: recipeLinks, error: recipeError }, { data: receipts, error: receiptsError }] = await Promise.all([
+        supabase.from("recipe_ingredients").select("id").eq("ingredient_id", id).limit(1),
+        supabase.from("ingredient_receipts").select("id").eq("ingredient_id", id).limit(1),
+      ]);
+      if (recipeError || receiptsError) throw recipeError || receiptsError;
+      if (recipeLinks?.length || receipts?.length) {
+        throw new Error("This ingredient is used by recipes or receiving history. Keep it for traceability instead of deleting it.");
+      }
       const { error } = await supabase.from("ingredients").delete().eq("id", id);
       if (error) throw error;
     },

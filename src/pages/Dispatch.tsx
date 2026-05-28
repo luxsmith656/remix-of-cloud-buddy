@@ -84,23 +84,31 @@ const Dispatch = () => {
     [batches, form.product_id],
   );
 
+  const selectedBatch = useMemo(
+    () => productBatches.find((batch) => batch.id === form.batch_id),
+    [form.batch_id, productBatches],
+  );
+
   const dispatchMutation = useMutation({
     mutationFn: async () => {
       if (!form.product_id) throw new Error("Select a product");
       if (form.quantity <= 0) throw new Error("Quantity must be greater than zero");
       if (form.unit_price < 0) throw new Error("Unit price cannot be negative");
       if (selectedProduct && form.quantity > selectedProduct.quantity) throw new Error("Not enough product stock");
+      if (selectedBatch && form.quantity > selectedBatch.quantity_produced) {
+        throw new Error("Not enough stock in the selected batch");
+      }
 
       const { error } = await supabase.rpc("dispatch_product", {
         product_id_value: form.product_id,
         quantity_value: form.quantity,
-        batch_id_value: form.batch_id === NO_BATCH ? undefined : form.batch_id,
+        batch_id_value: form.batch_id === NO_BATCH ? null : form.batch_id,
         dispatch_type_value: form.dispatch_type,
-        destination_value: form.destination || undefined,
-        reference_number_value: form.reference_number || undefined,
-        unit_price_value: form.unit_price || undefined,
-        dispatched_date_value: form.dispatched_date || undefined,
-        notes_value: form.notes || undefined,
+        destination_value: form.destination || null,
+        reference_number_value: form.reference_number || null,
+        unit_price_value: form.unit_price || null,
+        dispatched_date_value: form.dispatched_date || null,
+        notes_value: form.notes || null,
       });
       if (error) throw error;
     },

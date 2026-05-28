@@ -97,7 +97,7 @@ const BatchProduction = () => {
     if (!selectedProduct) { toast.error("Select a product"); return; }
     if (!expirationDate) { toast.error("Expiration date is required"); return; }
     if (new Date(expirationDate) <= new Date(productionDate)) { toast.error("Expiration date must be after production date"); return; }
-    if (normalizedCode && batches.some((batch: any) => [batch.batch_code, batch.barcode_token, batch.barcode_value].includes(normalizedCode))) {
+    if (normalizedCode && batches.some((batch: any) => [batch.batch_code, batch.barcode_token, batch.barcode_value].some((value) => normalizeBarcodeToken(value || "") === normalizedCode))) {
       toast.error("Batch barcode already exists");
       return;
     }
@@ -134,7 +134,7 @@ const BatchProduction = () => {
         quantity_value: quantity,
         production_date_value: productionDate,
         expiration_date_value: expirationDate,
-        batch_code_value: batchCode.trim() || undefined,
+        batch_code_value: batchCode.trim() || null,
       });
       if (error) throw error;
     },
