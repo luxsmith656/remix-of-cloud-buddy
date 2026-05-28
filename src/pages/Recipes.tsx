@@ -81,7 +81,7 @@ const Recipes = () => {
         name_value: recipeName.trim() || null,
         image_url_value: recipeImage || null,
         ingredients_value: ingredientsPayload,
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: (_, __, context) => {

@@ -102,13 +102,13 @@ const Dispatch = () => {
       const { error } = await supabase.rpc("dispatch_product", {
         product_id_value: form.product_id,
         quantity_value: form.quantity,
-        batch_id_value: form.batch_id === NO_BATCH ? null : form.batch_id,
+        batch_id_value: form.batch_id === NO_BATCH ? undefined : form.batch_id,
         dispatch_type_value: form.dispatch_type,
-        destination_value: form.destination || null,
-        reference_number_value: form.reference_number || null,
-        unit_price_value: form.unit_price || null,
-        dispatched_date_value: form.dispatched_date || null,
-        notes_value: form.notes || null,
+        destination_value: form.destination || undefined,
+        reference_number_value: form.reference_number || undefined,
+        unit_price_value: form.unit_price || undefined,
+        dispatched_date_value: form.dispatched_date || undefined,
+        notes_value: form.notes || undefined,
       });
       if (error) throw error;
     },
