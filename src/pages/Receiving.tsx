@@ -79,13 +79,13 @@ const Receiving = () => {
       const { error } = await supabase.rpc("receive_ingredient", {
         ingredient_id_value: form.ingredient_id,
         quantity_value: form.quantity,
-        supplier_id_value: form.supplier_id === NO_SUPPLIER ? null : form.supplier_id,
-        unit_cost_value: form.unit_cost || null,
-        lot_number_value: form.lot_number || null,
-        invoice_number_value: form.invoice_number || null,
-        received_date_value: form.received_date || null,
-        expiration_date_value: form.expiration_date || null,
-        notes_value: form.notes || null,
+        supplier_id_value: form.supplier_id === NO_SUPPLIER ? undefined : form.supplier_id,
+        unit_cost_value: form.unit_cost || undefined,
+        lot_number_value: form.lot_number || undefined,
+        invoice_number_value: form.invoice_number || undefined,
+        received_date_value: form.received_date || undefined,
+        expiration_date_value: form.expiration_date || undefined,
+        notes_value: form.notes || undefined,
       });
       if (error) throw error;
     },

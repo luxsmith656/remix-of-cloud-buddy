@@ -69,10 +69,10 @@ const Recipes = () => {
       if (!recipeIngredients.length) throw new Error("Add at least one ingredient");
       const ingredientsPayload = recipeIngredients.map(({ ingredient_id, quantity }) => ({ ingredient_id, quantity })) as unknown as Json;
       const { error } = await supabase.rpc("save_recipe", {
-        recipe_id_value: editingId,
+        recipe_id_value: (editingId ?? undefined) as string,
         product_id_value: selectedProduct,
-        name_value: recipeName || null,
-        image_url_value: recipeImage || null,
+        name_value: recipeName || "",
+        image_url_value: recipeImage || "",
         ingredients_value: ingredientsPayload,
       });
       if (error) throw error;

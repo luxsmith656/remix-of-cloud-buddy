@@ -93,14 +93,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          barcode_token?: string
-          barcode_value?: string
-          batch_code?: string
+          barcode_token: string
+          barcode_value: string
+          batch_code: string
           created_at?: string
           created_by?: string | null
           expiration_date?: string | null
           id?: string
-          manufactured_date?: string
+          manufactured_date: string
           price?: number
           product_id: string
           production_date?: string
@@ -168,56 +168,6 @@ export type Database = {
           },
         ]
       }
-      ingredients: {
-        Row: {
-          barcode: string | null
-          created_at: string
-          current_stock: number
-          expiration_date: string | null
-          id: string
-          min_stock: number
-          name: string
-          supplier_id: string | null
-          unit_cost: number
-          unit: string
-          updated_at: string
-        }
-        Insert: {
-          barcode?: string | null
-          created_at?: string
-          current_stock?: number
-          expiration_date?: string | null
-          id?: string
-          min_stock?: number
-          name: string
-          supplier_id?: string | null
-          unit_cost?: number
-          unit?: string
-          updated_at?: string
-        }
-        Update: {
-          barcode?: string | null
-          created_at?: string
-          current_stock?: number
-          expiration_date?: string | null
-          id?: string
-          min_stock?: number
-          name?: string
-          supplier_id?: string | null
-          unit_cost?: number
-          unit?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ingredients_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ingredient_receipts: {
         Row: {
           created_at: string
@@ -231,7 +181,7 @@ export type Database = {
           received_by: string | null
           received_date: string
           supplier_id: string | null
-          total_cost: number
+          total_cost: number | null
           unit_cost: number | null
         }
         Insert: {
@@ -246,6 +196,7 @@ export type Database = {
           received_by?: string | null
           received_date?: string
           supplier_id?: string | null
+          total_cost?: number | null
           unit_cost?: number | null
         }
         Update: {
@@ -260,6 +211,7 @@ export type Database = {
           received_by?: string | null
           received_date?: string
           supplier_id?: string | null
+          total_cost?: number | null
           unit_cost?: number | null
         }
         Relationships: [
@@ -272,6 +224,56 @@ export type Database = {
           },
           {
             foreignKeyName: "ingredient_receipts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingredients: {
+        Row: {
+          barcode: string | null
+          created_at: string
+          current_stock: number
+          expiration_date: string | null
+          id: string
+          min_stock: number
+          name: string
+          supplier_id: string | null
+          unit: string
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          created_at?: string
+          current_stock?: number
+          expiration_date?: string | null
+          id?: string
+          min_stock?: number
+          name: string
+          supplier_id?: string | null
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          created_at?: string
+          current_stock?: number
+          expiration_date?: string | null
+          id?: string
+          min_stock?: number
+          name?: string
+          supplier_id?: string | null
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredients_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
@@ -369,60 +371,6 @@ export type Database = {
         }
         Relationships: []
       }
-      products: {
-        Row: {
-          barcode: string | null
-          category: string
-          created_at: string
-          expiration_date: string | null
-          estimated_unit_cost: number
-          id: string
-          image_url: string | null
-          min_stock: number
-          name: string
-          quantity: number
-          shelf_life: number | null
-          status: Database["public"]["Enums"]["product_status"]
-          unit_price: number
-          updated_at: string
-          variant: string | null
-        }
-        Insert: {
-          barcode?: string | null
-          category?: string
-          created_at?: string
-          expiration_date?: string | null
-          estimated_unit_cost?: number
-          id?: string
-          image_url?: string | null
-          min_stock?: number
-          name: string
-          quantity?: number
-          shelf_life?: number | null
-          status?: Database["public"]["Enums"]["product_status"]
-          unit_price?: number
-          updated_at?: string
-          variant?: string | null
-        }
-        Update: {
-          barcode?: string | null
-          category?: string
-          created_at?: string
-          expiration_date?: string | null
-          estimated_unit_cost?: number
-          id?: string
-          image_url?: string | null
-          min_stock?: number
-          name?: string
-          quantity?: number
-          shelf_life?: number | null
-          status?: Database["public"]["Enums"]["product_status"]
-          unit_price?: number
-          updated_at?: string
-          variant?: string | null
-        }
-        Relationships: []
-      }
       product_dispatches: {
         Row: {
           batch_id: string | null
@@ -436,7 +384,7 @@ export type Database = {
           product_id: string
           quantity: number
           reference_number: string | null
-          total_value: number
+          total_value: number | null
           unit_price: number | null
         }
         Insert: {
@@ -451,6 +399,7 @@ export type Database = {
           product_id: string
           quantity: number
           reference_number?: string | null
+          total_value?: number | null
           unit_price?: number | null
         }
         Update: {
@@ -465,6 +414,7 @@ export type Database = {
           product_id?: string
           quantity?: number
           reference_number?: string | null
+          total_value?: number | null
           unit_price?: number | null
         }
         Relationships: [
@@ -483,6 +433,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      products: {
+        Row: {
+          barcode: string | null
+          category: string
+          created_at: string
+          estimated_unit_cost: number
+          expiration_date: string | null
+          id: string
+          image_url: string | null
+          min_stock: number
+          name: string
+          quantity: number
+          shelf_life: number | null
+          status: Database["public"]["Enums"]["product_status"]
+          unit_price: number
+          updated_at: string
+          variant: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          category?: string
+          created_at?: string
+          estimated_unit_cost?: number
+          expiration_date?: string | null
+          id?: string
+          image_url?: string | null
+          min_stock?: number
+          name: string
+          quantity?: number
+          shelf_life?: number | null
+          status?: Database["public"]["Enums"]["product_status"]
+          unit_price?: number
+          updated_at?: string
+          variant?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          category?: string
+          created_at?: string
+          estimated_unit_cost?: number
+          expiration_date?: string | null
+          id?: string
+          image_url?: string | null
+          min_stock?: number
+          name?: string
+          quantity?: number
+          shelf_life?: number | null
+          status?: Database["public"]["Enums"]["product_status"]
+          unit_price?: number
+          updated_at?: string
+          variant?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -625,7 +629,15 @@ export type Database = {
           type?: Database["public"]["Enums"]["movement_type"]
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {
@@ -699,31 +711,24 @@ export type Database = {
       }
       dispatch_product: {
         Args: {
-          batch_id_value?: string | null
-          destination_value?: string | null
+          batch_id_value?: string
+          destination_value?: string
           dispatch_type_value?: string
-          dispatched_date_value?: string | null
-          notes_value?: string | null
+          dispatched_date_value?: string
+          notes_value?: string
           product_id_value: string
           quantity_value: number
-          reference_number_value?: string | null
-          unit_price_value?: number | null
+          reference_number_value?: string
+          unit_price_value?: number
         }
         Returns: string
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
       }
       find_batch_by_barcode: {
         Args: { barcode_value_value: string }
         Returns: {
+          barcode_token: string
           batch_code: string
           batch_id: string
-          barcode_token: string
           category: string
           defect_quantity: number
           expiration_date: string
@@ -733,10 +738,21 @@ export type Database = {
           product_name: string
           quantity_produced: number
           remaining_quantity: number
-          shelf_life: number | null
+          shelf_life: number
           status: Database["public"]["Enums"]["batch_status"]
-          variant: string | null
+          variant: string
         }[]
+      }
+      generate_batch_token: {
+        Args: { product_name_value: string; production_date_value: string }
+        Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       log_defect: {
         Args: {
@@ -746,9 +762,10 @@ export type Database = {
         }
         Returns: string
       }
+      normalize_batch_token: { Args: { value: string }; Returns: string }
       produce_batch: {
         Args: {
-          batch_code_value?: string | null
+          batch_code_value?: string
           expiration_date_value: string
           product_id_value: string
           production_date_value?: string
@@ -756,17 +773,18 @@ export type Database = {
         }
         Returns: string
       }
+      product_code: { Args: { value: string }; Returns: string }
       receive_ingredient: {
         Args: {
-          expiration_date_value?: string | null
+          expiration_date_value?: string
           ingredient_id_value: string
-          invoice_number_value?: string | null
-          lot_number_value?: string | null
-          notes_value?: string | null
+          invoice_number_value?: string
+          lot_number_value?: string
+          notes_value?: string
           quantity_value: number
-          received_date_value?: string | null
-          supplier_id_value?: string | null
-          unit_cost_value?: number | null
+          received_date_value?: string
+          supplier_id_value?: string
+          unit_cost_value?: number
         }
         Returns: string
       }
@@ -790,11 +808,11 @@ export type Database = {
       }
       save_recipe: {
         Args: {
-          image_url_value: string | null
+          image_url_value: string
           ingredients_value: Json
-          name_value: string | null
+          name_value: string
           product_id_value: string
-          recipe_id_value: string | null
+          recipe_id_value: string
         }
         Returns: string
       }
