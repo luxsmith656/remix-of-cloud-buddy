@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Camera, Search, StopCircle } from "lucide-react";
 import { toast } from "sonner";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType, type IScannerControls } from "@zxing/library";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { normalizeBarcodeToken } from "@/lib/barcode";
+import { cacheBatch, getCachedBatch } from "@/lib/offlineCache";
 
 type ScanStatus = "ready" | "scanning" | "found" | "not-found" | "expired" | "near-expiry" | "defective" | "no-camera-permission";
 
@@ -41,30 +44,47 @@ const BarcodeScanner = () => {
   const [batch, setBatch] = useState<any | null>(null);
   const [movements, setMovements] = useState<any[]>([]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const scanningRef = useRef(false);
+  const controlsRef = useRef<IScannerControls | null>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
 
   const lookupMutation = useMutation({
     mutationFn: async (code: string) => {
       const normalized = normalizeBarcodeToken(code);
       if (!normalized) throw new Error("Enter or scan a barcode");
-
-      const { data, error } = await supabase.rpc("find_batch_by_barcode", { barcode_value_value: normalized });
-      if (error) throw error;
-      const found = data?.[0] || null;
-      const { data: movementRows } = await supabase
-        .from("stock_movements")
-        .select("*")
-        .or(`batch_code.eq.${normalized},remarks.ilike.%${normalized}%`)
-        .order("created_at", { ascending: false })
-        .limit(8);
-      return { found, movementRows: movementRows || [] };
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const cached = await getCachedBatch(normalized);
+        return { found: (cached?.batch as any) ?? null, movementRows: [], offline: true, cachedAt: cached?.cachedAt ?? null };
+      }
+      try {
+        const { data, error } = await supabase.rpc("find_batch_by_barcode", { barcode_value_value: normalized });
+        if (error) throw error;
+        const found = data?.[0] || null;
+        if (found) await cacheBatch(normalized, found as any);
+        const { data: movementRows } = await supabase
+          .from("stock_movements")
+          .select("*")
+          .or(`batch_code.eq.${normalized},remarks.ilike.%${normalized}%`)
+          .order("created_at", { ascending: false })
+          .limit(8);
+        return { found, movementRows: movementRows || [], offline: false, cachedAt: null };
+      } catch (err) {
+        const cached = await getCachedBatch(normalized);
+        if (cached) return { found: cached.batch as any, movementRows: [], offline: true, cachedAt: cached.cachedAt };
+        throw err;
+      }
     },
-    onSuccess: ({ found, movementRows }) => {
+    onSuccess: ({ found, movementRows, offline, cachedAt }) => {
       setBatch(found);
       setMovements(movementRows);
+      setFromCache(Boolean(offline));
+      setCachedAt(cachedAt ?? null);
       setStatus(found ? getBatchStatus(found) : "not-found");
       if (!found) toast.error("No batch found for that barcode");
+      else if (offline) toast.message("Showing cached batch (offline)");
     },
     onError: (error) => {
       setStatus("not-found");
@@ -73,54 +93,76 @@ const BarcodeScanner = () => {
   });
 
   const stopCamera = () => {
-    scanningRef.current = false;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    try { controlsRef.current?.stop(); } catch { /* noop */ }
+    controlsRef.current = null;
     setStatus(batch ? getBatchStatus(batch) : "ready");
   };
 
   const startCamera = async () => {
-    const BarcodeDetectorCtor = (window as any).BarcodeDetector;
-    if (!BarcodeDetectorCtor) {
-      toast.error("Camera barcode detection is not available in this browser. Use manual search or a USB scanner.");
-      setStatus("ready");
+    if (typeof window === "undefined") return;
+    if (!window.isSecureContext) {
+      toast.error("Camera requires HTTPS. Open the app on its published URL.");
       return;
     }
-
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error("This browser does not expose a camera. Use manual search or a USB scanner.");
+      return;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      if (!readerRef.current) {
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+          BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX, BarcodeFormat.ITF,
+        ]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        readerRef.current = new BrowserMultiFormatReader(hints);
       }
-      const detector = new BarcodeDetectorCtor({ formats: ["code_128", "qr_code", "ean_13", "code_39"] });
-      scanningRef.current = true;
-      setStatus("scanning");
+      // iOS Safari needs the video element to be in the DOM and ready before play.
+      const video = videoRef.current!;
+      video.setAttribute("playsinline", "true");
+      video.muted = true;
 
-      const scan = async () => {
-        if (!scanningRef.current || !videoRef.current) return;
-        const codes = await detector.detect(videoRef.current).catch(() => []);
-        if (codes.length > 0) {
-          const rawValue = codes[0].rawValue;
-          stopCamera();
-          setManualCode(rawValue);
-          lookupMutation.mutate(rawValue);
-          return;
+      const constraints: MediaStreamConstraints = deviceId
+        ? { video: { deviceId: { exact: deviceId } }, audio: false }
+        : { video: { facingMode: { ideal: "environment" } }, audio: false };
+
+      setStatus("scanning");
+      const controls = await readerRef.current.decodeFromConstraints(constraints, video, (result, err, ctrl) => {
+        if (result) {
+          try { ctrl.stop(); } catch { /* noop */ }
+          controlsRef.current = null;
+          const value = result.getText();
+          setManualCode(value);
+          lookupMutation.mutate(value);
         }
-        requestAnimationFrame(scan);
-      };
-      requestAnimationFrame(scan);
-    } catch {
-      setStatus("no-camera-permission");
-      toast.error("Camera permission was denied or unavailable");
+      });
+      controlsRef.current = controls;
+
+      // Refresh device list after permission was granted (labels become available).
+      try {
+        const list = await BrowserMultiFormatReader.listVideoInputDevices();
+        setDevices(list);
+      } catch { /* noop */ }
+    } catch (err: any) {
+      const name = err?.name || "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setStatus("no-camera-permission");
+        toast.error("Camera permission denied. Allow camera access in browser settings.");
+      } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+        toast.error("No suitable camera found on this device.");
+        setStatus("ready");
+      } else {
+        toast.error(err?.message || "Could not start the camera.");
+        setStatus("ready");
+      }
     }
   };
 
   useEffect(() => () => {
-    scanningRef.current = false;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    try { controlsRef.current?.stop(); } catch { /* noop */ }
+    controlsRef.current = null;
   }, []);
 
   return (
@@ -141,6 +183,18 @@ const BarcodeScanner = () => {
               <Button onClick={startCamera} disabled={status === "scanning"} className="gap-2 bg-primary text-primary-foreground"><Camera className="h-4 w-4" /> Scan Camera</Button>
               <Button onClick={stopCamera} variant="outline" disabled={status !== "scanning"} className="gap-2"><StopCircle className="h-4 w-4" /> Stop</Button>
             </div>
+            {devices.length > 1 && (
+              <select
+                value={deviceId ?? ""}
+                onChange={(e) => setDeviceId(e.target.value || undefined)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Auto (rear camera)</option>
+                {devices.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 6)}`}</option>
+                ))}
+              </select>
+            )}
             <div className="flex gap-2">
               <Input
                 autoFocus
@@ -151,6 +205,10 @@ const BarcodeScanner = () => {
               />
               <Button onClick={() => lookupMutation.mutate(manualCode)} variant="outline" className="gap-2"><Search className="h-4 w-4" /> Search</Button>
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Tip: USB and Bluetooth scanners work too — just focus the input and scan.
+              {fromCache && cachedAt && <> Last synced {new Date(cachedAt).toLocaleString()}.</>}
+            </p>
           </CardContent>
         </Card>
 
