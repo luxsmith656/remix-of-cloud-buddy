@@ -134,7 +134,7 @@ const BatchProduction = () => {
         quantity_value: quantity,
         production_date_value: productionDate,
         expiration_date_value: expirationDate,
-        batch_code_value: batchCode.trim() || null,
+        batch_code_value: batchCode.trim() || undefined,
       });
       if (error) throw error;
     },
