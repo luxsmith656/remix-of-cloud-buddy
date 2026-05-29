@@ -53,13 +53,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <header className="h-16 flex items-center justify-between border-b border-border px-4 bg-card shrink-0">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="text-muted-foreground" />
-              <div className="relative hidden md:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products, records, or batches..."
-                  className="pl-10 w-80 h-10 bg-background border-border"
-                />
-              </div>
             </div>
             <div className="flex items-center gap-4">
               <Popover>
