@@ -12,12 +12,13 @@ import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { logAuditAction } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
+import { isOnline, markCachedRowDeleted, queueSyncAction, readWithOfflineCache, upsertCachedRow } from "@/lib/offlineStore";
 
 type Ingredient = Tables<"ingredients">;
 type Supplier = Tables<"suppliers">;
 
 const NO_SUPPLIER = "none";
-const emptyForm = { name: "", barcode: "", unit: "kg", current_stock: 0, min_stock: 0, unit_cost: 0, supplier_id: NO_SUPPLIER, expiration_date: "" };
+const emptyForm = { name: "", unit: "kg", current_stock: 0, min_stock: 0, unit_cost: 0, supplier_id: NO_SUPPLIER, expiration_date: "" };
 
 const Ingredients = () => {
   const [search, setSearch] = useState("");
@@ -31,23 +32,41 @@ const Ingredients = () => {
   const { data: ingredients = [], isLoading } = useQuery({
     queryKey: ["ingredients"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("ingredients").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("ingredients", async () => {
+        const { data, error } = await supabase.from("ingredients").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("suppliers").select("*");
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("suppliers", async () => {
+        const { data, error } = await supabase.from("suppliers").select("*");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const upsertMutation = useMutation({
     mutationFn: async (p: any) => {
+      if (!isOnline()) {
+        const offlineRow = { ...p, id: p.id || `local-${crypto.randomUUID()}`, sync_status: "Pending Sync" };
+        await upsertCachedRow("ingredients", offlineRow, true);
+        await queueSyncAction({
+          module: "Ingredients",
+          actionType: "table-upsert",
+          table: "ingredients",
+          payload: offlineRow,
+          localId: offlineRow.id,
+          userId: user?.id,
+          expectedUpdatedAt: editing?.updated_at ?? null,
+        });
+        return { offline: true };
+      }
       if (p.id) {
         const { error } = await supabase.from("ingredients").update(p).eq("id", p.id);
         if (error) throw error;
@@ -56,7 +75,7 @@ const Ingredients = () => {
         if (error) throw error;
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["ingredients"] });
       setModalOpen(false);
       setEditing(null);
@@ -66,13 +85,25 @@ const Ingredients = () => {
         ? `Updated ingredient: ${variables.name}`
         : `Created ingredient: ${variables.name}`;
       logAuditAction(action, "Ingredients", details, user?.id);
-      toast.success(editing ? "Ingredient updated" : "Ingredient added");
+      toast.success((result as any)?.offline ? "Ingredient saved offline - Pending Sync" : editing ? "Ingredient updated" : "Ingredient added");
     },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (!isOnline()) {
+        await markCachedRowDeleted("ingredients", id);
+        await queueSyncAction({
+          module: "Ingredients",
+          actionType: "table-delete",
+          table: "ingredients",
+          payload: { id },
+          localId: id,
+          userId: user?.id,
+        });
+        return { offline: true };
+      }
       const [{ data: recipeLinks, error: recipeError }, { data: receipts, error: receiptsError }] = await Promise.all([
         supabase.from("recipe_ingredients").select("id").eq("ingredient_id", id).limit(1),
         supabase.from("ingredient_receipts").select("id").eq("ingredient_id", id).limit(1),
@@ -84,19 +115,19 @@ const Ingredients = () => {
       const { error } = await supabase.from("ingredients").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, deletedId) => {
+    onSuccess: (result, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["ingredients"] });
       setDeleteConfirm(null);
       const deletedIngredient = ingredients.find(i => i.id === deletedId);
       logAuditAction("DELETE", "Ingredients", `Deleted ingredient: ${deletedIngredient?.name || 'Unknown'}`, user?.id);
-      toast.success("Ingredient deleted");
+      toast.success((result as any)?.offline ? "Ingredient delete saved offline - Pending Sync" : "Ingredient deleted");
     },
     onError: (e) => toast.error(e.message),
   });
 
   const openEdit = (i: Ingredient) => {
     setEditing(i);
-    setForm({ name: i.name, barcode: i.barcode || "", unit: i.unit, current_stock: i.current_stock, min_stock: i.min_stock, unit_cost: i.unit_cost, supplier_id: i.supplier_id || NO_SUPPLIER, expiration_date: i.expiration_date || "" });
+    setForm({ name: i.name, unit: i.unit, current_stock: i.current_stock, min_stock: i.min_stock, unit_cost: i.unit_cost, supplier_id: i.supplier_id || NO_SUPPLIER, expiration_date: i.expiration_date || "" });
     setModalOpen(true);
   };
 
@@ -106,7 +137,7 @@ const Ingredients = () => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     const payload: any = {
-      name: form.name.trim(), barcode: form.barcode.trim() || null, unit: form.unit, current_stock: form.current_stock,
+      name: form.name.trim(), unit: form.unit, current_stock: form.current_stock,
       min_stock: form.min_stock, unit_cost: form.unit_cost, supplier_id: form.supplier_id === NO_SUPPLIER ? null : form.supplier_id,
       expiration_date: form.expiration_date || null,
     };
@@ -116,7 +147,7 @@ const Ingredients = () => {
 
   const filtered = ingredients.filter(i => {
     const normalizedSearch = search.toLowerCase();
-    return i.name.toLowerCase().includes(normalizedSearch) || (i.barcode || "").toLowerCase().includes(normalizedSearch);
+    return i.name.toLowerCase().includes(normalizedSearch);
   });
   const getSupplier = (id: string | null) => suppliers.find(s => s.id === id);
 
@@ -145,7 +176,7 @@ const Ingredients = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Name", "Barcode", "Unit", "Current Stock", "Min Stock", "Unit Cost", "Supplier", "Expiration", "Status", "Actions"].map(h => (
+                  {["Name", "Unit", "Current Stock", "Min Stock", "Unit Cost", "Supplier", "Expiration", "Status", "Actions"].map(h => (
                     <th key={h} className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -156,8 +187,10 @@ const Ingredients = () => {
                   const supplier = getSupplier(i.supplier_id);
                   return (
                     <tr key={i.id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${isLow ? "bg-destructive/5" : ""}`}>
-                      <td className="p-4 text-sm font-medium text-foreground">{i.name}</td>
-                      <td className="p-4 text-sm text-muted-foreground">{i.barcode || "-"}</td>
+                      <td className="p-4 text-sm font-medium text-foreground">
+                        {i.name}
+                        {(i as any).sync_status && <span className="ml-2 rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">{(i as any).sync_status}</span>}
+                      </td>
                       <td className="p-4 text-sm text-muted-foreground">{i.unit}</td>
                       <td className="p-4 text-sm font-medium text-foreground">{i.current_stock}</td>
                       <td className="p-4 text-sm text-muted-foreground">{i.min_stock}</td>
@@ -192,10 +225,6 @@ const Ingredients = () => {
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Name *</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Barcode</Label>
-                <Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="SKU or barcode" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unit</Label>

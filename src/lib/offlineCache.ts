@@ -1,4 +1,4 @@
-// IndexedDB cache for read-only data so the app remains usable offline.
+// IndexedDB cache for scanner data so the app remains usable offline.
 // We cache batches + products so the barcode scanner can resolve lookups
 // without network. Other modules can extend the same store as needed.
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
@@ -24,7 +24,7 @@ let dbPromise: Promise<IDBPDatabase<CBSchema>> | null = null;
 function getDb() {
   if (typeof indexedDB === "undefined") return null;
   if (!dbPromise) {
-    dbPromise = openDB<CBSchema>("cloud-buddy", 1, {
+    dbPromise = openDB<CBSchema>("ellines-food-product-scanner", 1, {
       upgrade(db) {
         const batches = db.createObjectStore("batches", { keyPath: "token" });
         batches.createIndex("by-cached", "cachedAt");

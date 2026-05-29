@@ -15,6 +15,7 @@ import { logAuditAction } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadCompressedImage, ACCEPT_ATTR } from "@/lib/imageUpload";
 import { computeProductStatus } from "@/lib/inventory";
+import { isOnline, markCachedRowDeleted, queueSyncAction, readWithOfflineCache, upsertCachedRow } from "@/lib/offlineStore";
 
 type Product = Tables<"products">;
 
@@ -64,23 +65,41 @@ const Products = () => {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("products", async () => {
+        const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("batches").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("batches", async () => {
+        const { data, error } = await supabase.from("batches").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const upsertMutation = useMutation({
     mutationFn: async (p: TablesInsert<"products"> & { id?: string }) => {
+      if (!isOnline()) {
+        const offlineRow = { ...p, id: p.id || `local-${crypto.randomUUID()}`, sync_status: "Pending Sync" };
+        await upsertCachedRow("products", offlineRow, true);
+        await queueSyncAction({
+          module: "Products",
+          actionType: "table-upsert",
+          table: "products",
+          payload: offlineRow,
+          localId: offlineRow.id,
+          userId: user?.id,
+          expectedUpdatedAt: editingProduct?.updated_at ?? null,
+        });
+        return { offline: true };
+      }
       if (p.id) {
         const { id, ...payload } = p;
         const { error } = await supabase.from("products").update(payload).eq("id", id);
@@ -90,7 +109,7 @@ const Products = () => {
         if (error) throw error;
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setModalOpen(false);
       setEditingProduct(null);
@@ -100,13 +119,25 @@ const Products = () => {
         ? `Updated product: ${variables.name}`
         : `Created product: ${variables.name}`;
       logAuditAction(action, "Products", details, user?.id);
-      toast.success(editingProduct ? "Product updated" : "Product added");
+      toast.success((result as any)?.offline ? "Product saved offline - Pending Sync" : editingProduct ? "Product updated" : "Product added");
     },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (!isOnline()) {
+        await markCachedRowDeleted("products", id);
+        await queueSyncAction({
+          module: "Products",
+          actionType: "table-delete",
+          table: "products",
+          payload: { id },
+          localId: id,
+          userId: user?.id,
+        });
+        return { offline: true };
+      }
       const [{ data: linkedBatches, error: batchesError }, { data: linkedRecipes, error: recipesError }, { data: linkedDispatches, error: dispatchesError }] = await Promise.all([
         supabase.from("batches").select("id").eq("product_id", id).limit(1),
         supabase.from("recipes").select("id").eq("product_id", id).limit(1),
@@ -119,12 +150,12 @@ const Products = () => {
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, deletedId) => {
+    onSuccess: (result, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setDeleteConfirm(null);
       const deletedProduct = products.find(p => p.id === deletedId);
       logAuditAction("DELETE", "Products", `Deleted product: ${deletedProduct?.name || 'Unknown'}`, user?.id);
-      toast.success("Product deleted");
+      toast.success((result as any)?.offline ? "Product delete saved offline - Pending Sync" : "Product deleted");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -264,6 +295,7 @@ const Products = () => {
                         </td>
                         <td className="p-4">
                           <p className="text-sm font-medium text-foreground">{p.name} {p.variant ? `(${p.variant})` : ""}</p>
+                          {(p as any).sync_status && <span className="mt-1 inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">{(p as any).sync_status}</span>}
                         </td>
                         <td className="p-4 text-sm text-muted-foreground">{p.barcode || "-"}</td>
                         <td className="p-4">

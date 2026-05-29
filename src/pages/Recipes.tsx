@@ -14,6 +14,7 @@ import { logAuditAction } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadCompressedImage, ACCEPT_ATTR } from "@/lib/imageUpload";
 import type { Json } from "@/integrations/supabase/types";
+import { isOnline, queueSyncAction, readWithOfflineCache } from "@/lib/offlineStore";
 
 interface RecipeIngredientForm { ingredient_id: string; quantity: number; }
 
@@ -47,20 +48,22 @@ const Recipes = () => {
   const { data: recipes = [], isLoading } = useQuery({
     queryKey: ["recipes-full"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("recipes").select("*, products(*), recipe_ingredients(*, ingredients(*))");
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("recipes", async () => {
+        const { data, error } = await supabase.from("recipes").select("*, products(*), recipe_ingredients(*, ingredients(*))");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => { const { data } = await supabase.from("products").select("*"); return data || []; },
+    queryFn: async () => readWithOfflineCache("products", async () => { const { data } = await supabase.from("products").select("*"); return data || []; }),
   });
 
   const { data: ingredients = [] } = useQuery({
     queryKey: ["ingredients"],
-    queryFn: async () => { const { data } = await supabase.from("ingredients").select("*"); return data || []; },
+    queryFn: async () => readWithOfflineCache("ingredients", async () => { const { data } = await supabase.from("ingredients").select("*"); return data || []; }),
   });
 
   const saveMutation = useMutation({
@@ -75,16 +78,21 @@ const Recipes = () => {
         throw new Error("Each ingredient can only appear once in a recipe");
       }
       const ingredientsPayload = recipeIngredients.map(({ ingredient_id, quantity }) => ({ ingredient_id, quantity })) as unknown as Json;
-      const { error } = await supabase.rpc("save_recipe", {
+      const payload = {
         recipe_id_value: editingId,
         product_id_value: selectedProduct,
         name_value: recipeName.trim() || null,
         image_url_value: recipeImage || null,
         ingredients_value: ingredientsPayload,
-      } as any);
+      };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Recipes", actionType: "rpc", rpcName: "save_recipe", payload, userId: user?.id });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("save_recipe", payload);
       if (error) throw error;
     },
-    onSuccess: (_, __, context) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["recipes-full"] });
       closeModal();
       const action = editingId ? "UPDATE" : "CREATE";
@@ -92,22 +100,27 @@ const Recipes = () => {
         ? `Updated recipe: ${recipeName || 'Unnamed'}`
         : `Created recipe: ${recipeName || 'Unnamed'}`;
       logAuditAction(action, "Recipes", details, user?.id);
-      toast.success(editingId ? "Recipe updated" : "Recipe created");
+      toast.success((result as any)?.offline ? "Recipe saved offline - Pending Sync" : editingId ? "Recipe updated" : "Recipe created");
     },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.rpc("delete_recipe", { recipe_id_value: id });
+      const payload = { recipe_id_value: id };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Recipes", actionType: "rpc", rpcName: "delete_recipe", payload, userId: user?.id });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("delete_recipe", payload);
       if (error) throw error;
     },
-    onSuccess: (_, deletedId) => {
+    onSuccess: (result, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["recipes-full"] });
       setDeleteConfirm(null);
       const deletedRecipe = recipes.find(r => r.id === deletedId);
       logAuditAction("DELETE", "Recipes", `Deleted recipe: ${deletedRecipe?.name || 'Unnamed'}`, user?.id);
-      toast.success("Recipe deleted");
+      toast.success((result as any)?.offline ? "Recipe delete saved offline - Pending Sync" : "Recipe deleted");
     },
     onError: (e) => toast.error(e.message),
   });

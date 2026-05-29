@@ -38,16 +38,17 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
+  const visibleNavItems = navItems.filter((item) => item.url !== "/roles" || isAdmin);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <div className="p-4 flex items-center gap-3 border-b border-sidebar-border">
-        <img src={ellineLogo} alt="Cloud Buddy" width={40} height={40} />
+        <img src={ellineLogo} alt="Elline's Food Product" width={40} height={40} />
         {!collapsed && (
           <div>
-            <p className="font-heading font-bold text-sm text-foreground leading-tight">Cloud Buddy</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Inventory</p>
+            <p className="font-heading font-bold text-sm text-foreground leading-tight">Elline's Food Product</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Inventory System</p>
           </div>
         )}
       </div>
@@ -55,7 +56,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink

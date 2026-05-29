@@ -22,9 +22,9 @@ export default defineConfig(({ mode }) => ({
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "elline-logo.png", "apple-touch-icon.png", "robots.txt"],
       manifest: {
-        name: "Cloud Buddy - Inventory Management",
-        short_name: "Cloud Buddy",
-        description: "Inventory management, barcode scanning, batch tracking, and read-only offline lookup.",
+        name: "Elline's Food Product",
+        short_name: "Elline's Food",
+        description: "Offline-first inventory management, barcode scanning, batch tracking, and production records for Elline's Food Product.",
         theme_color: "#0f172a",
         background_color: "#0f172a",
         display: "standalone",
@@ -49,18 +49,18 @@ export default defineConfig(({ mode }) => ({
           {
             urlPattern: ({ request }) => request.mode === "navigate",
             handler: "NetworkFirst",
-            options: { cacheName: "cb-html", networkTimeoutSeconds: 3 },
+            options: { cacheName: "elline-html", networkTimeoutSeconds: 3 },
           },
           {
             urlPattern: /\.(?:js|css|woff2)$/,
             handler: "StaleWhileRevalidate",
-            options: { cacheName: "cb-assets" },
+            options: { cacheName: "elline-assets" },
           },
           {
             urlPattern: ({ url }) => /\.(?:png|jpg|jpeg|webp|svg|gif|ico)$/.test(url.pathname),
             handler: "CacheFirst",
             options: {
-              cacheName: "cb-images",
+              cacheName: "elline-images",
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
@@ -68,8 +68,18 @@ export default defineConfig(({ mode }) => ({
             urlPattern: ({ url }) => url.hostname.endsWith(".supabase.co") && url.pathname.includes("/storage/v1/object/public/"),
             handler: "CacheFirst",
             options: {
-              cacheName: "cb-supabase-storage",
+              cacheName: "elline-supabase-storage",
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: ({ url, request }) => url.hostname.endsWith(".supabase.co") && url.pathname.includes("/rest/v1/") && request.method === "GET",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "elline-supabase-rest",
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

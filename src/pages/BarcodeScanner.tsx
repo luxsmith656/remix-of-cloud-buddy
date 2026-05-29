@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Camera, RefreshCw, Search, StopCircle } from "lucide-react";
+import { Camera, Flashlight, RefreshCw, Search, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
@@ -12,17 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import { normalizeBarcodeToken } from "@/lib/barcode";
 import { cacheBatch, cacheBatches, getCachedBatch, getMeta } from "@/lib/offlineCache";
 
-type ScanStatus = "ready" | "scanning" | "found" | "not-found" | "expired" | "near-expiry" | "defective" | "no-camera-permission";
+type ScanStatus = "ready" | "scanning" | "checking" | "found" | "not-found" | "unreadable" | "expired" | "near-expiry" | "defective" | "no-camera-permission" | "database-error";
 
 const statusLabels: Record<ScanStatus, string> = {
   ready: "Ready to scan",
-  scanning: "Scanning",
-  found: "Found",
-  "not-found": "Not found",
+  scanning: "Scanning... hold barcode inside the box",
+  checking: "Barcode detected, checking batch...",
+  found: "Batch found",
+  "not-found": "Barcode scanned but no matching batch found",
+  unreadable: "Too blurry or unreadable, try better lighting or move closer",
   expired: "Expired",
   "near-expiry": "Near expiry",
   defective: "Defective",
-  "no-camera-permission": "No camera permission",
+  "no-camera-permission": "Camera permission needed",
+  "database-error": "Barcode read, but database lookup failed",
 };
 
 const getBatchStatus = (batch: any): ScanStatus => {
@@ -67,11 +70,15 @@ const BarcodeScanner = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const scanTimeoutRef = useRef<number | null>(null);
+  const lastScannedRef = useRef<{ value: string; at: number } | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
   const [lastSync, setLastSync] = useState<number | null>(null);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const syncQuery = useQuery({
     queryKey: ["barcode-offline-sync"],
@@ -103,6 +110,7 @@ const BarcodeScanner = () => {
     mutationFn: async (code: string) => {
       const normalized = normalizeBarcodeToken(code);
       if (!normalized) throw new Error("Enter or scan a barcode");
+      setStatus("checking");
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         const cached = await getCachedBatch(normalized);
         return { found: (cached?.batch as any) ?? null, movementRows: [], offline: true, cachedAt: cached?.cachedAt ?? null };
@@ -131,19 +139,43 @@ const BarcodeScanner = () => {
       setFromCache(Boolean(offline));
       setCachedAt(cachedAt ?? null);
       setStatus(found ? getBatchStatus(found) : "not-found");
-      if (!found) toast.error("No batch found for that barcode");
+      if (!found) toast.error("Barcode scanned, but no matching batch exists");
       else if (offline) toast.message("Showing cached batch (offline)");
     },
     onError: (error) => {
-      setStatus("not-found");
+      setStatus("database-error");
       toast.error(error.message);
     },
   });
 
   const stopCamera = () => {
+    if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
+    scanTimeoutRef.current = null;
     try { controlsRef.current?.stop(); } catch { /* noop */ }
     controlsRef.current = null;
+    setTorchOn(false);
+    setTorchSupported(false);
     setStatus(batch ? getBatchStatus(batch) : "ready");
+  };
+
+  const updateTorchSupport = () => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const track = stream?.getVideoTracks()[0];
+    const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+    setTorchSupported(Boolean(capabilities?.torch));
+  };
+
+  const toggleTorch = async () => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const track = stream?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !torchOn } as MediaTrackConstraintSet] });
+      setTorchOn((value) => !value);
+    } catch {
+      toast.error("Flashlight is not available on this camera.");
+      setTorchSupported(false);
+    }
   };
 
   const startCamera = async () => {
@@ -160,9 +192,8 @@ const BarcodeScanner = () => {
       if (!readerRef.current) {
         const hints = new Map();
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-          BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.EAN_13,
-          BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-          BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX, BarcodeFormat.ITF,
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.QR_CODE,
         ]);
         hints.set(DecodeHintType.TRY_HARDER, true);
         readerRef.current = new BrowserMultiFormatReader(hints);
@@ -173,20 +204,31 @@ const BarcodeScanner = () => {
       video.muted = true;
 
       const constraints: MediaStreamConstraints = deviceId
-        ? { video: { deviceId: { exact: deviceId } }, audio: false }
-        : { video: { facingMode: { ideal: "environment" } }, audio: false };
+        ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }, audio: false }
+        : { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }, audio: false };
 
       setStatus("scanning");
+      scanTimeoutRef.current = window.setTimeout(() => {
+        if (status !== "checking" && controlsRef.current) setStatus("unreadable");
+      }, 10_000);
       const controls = await readerRef.current.decodeFromConstraints(constraints, video, (result, err, ctrl) => {
         if (result) {
           try { ctrl.stop(); } catch { /* noop */ }
           controlsRef.current = null;
-          const value = result.getText();
+          if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
+          scanTimeoutRef.current = null;
+          const value = normalizeBarcodeToken(result.getText());
+          const previous = lastScannedRef.current;
+          if (previous?.value === value && Date.now() - previous.at < 2500) return;
+          lastScannedRef.current = { value, at: Date.now() };
           setManualCode(value);
           lookupMutation.mutate(value);
+        } else if (err && status === "unreadable") {
+          setStatus("scanning");
         }
       });
       controlsRef.current = controls;
+      window.setTimeout(updateTorchSupport, 350);
 
       // Refresh device list after permission was granted (labels become available).
       try {
@@ -209,6 +251,7 @@ const BarcodeScanner = () => {
   };
 
   useEffect(() => () => {
+    if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
     try { controlsRef.current?.stop(); } catch { /* noop */ }
     controlsRef.current = null;
   }, []);
@@ -231,19 +274,25 @@ const BarcodeScanner = () => {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="font-heading text-3xl font-bold text-foreground">Barcode Scanner</h1>
-        <p className="text-muted-foreground mt-1">Scan an internal batch token to fetch batch details from Cloud Buddy.</p>
+        <p className="text-muted-foreground mt-1">Scan an internal batch token to fetch batch details from Elline's Food Product.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
         <Card>
           <CardContent className="p-5 space-y-4">
-            <div className="aspect-video rounded-md border bg-muted overflow-hidden">
+            <div className="relative aspect-video rounded-md border bg-white overflow-hidden">
               <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="h-24 w-[78%] rounded-md border-4 border-white shadow-[0_0_0_999px_rgba(0,0,0,0.22)]" />
+              </div>
             </div>
-            <Badge variant="outline">{statusLabels[status]}</Badge>
-            <div className="flex gap-2">
+            <Badge variant={status === "not-found" || status === "unreadable" || status === "database-error" || status === "no-camera-permission" ? "destructive" : "outline"}>
+              {statusLabels[status]}
+            </Badge>
+            <div className="flex flex-wrap gap-2">
               <Button onClick={startCamera} disabled={status === "scanning"} className="gap-2 bg-primary text-primary-foreground"><Camera className="h-4 w-4" /> Scan Camera</Button>
               <Button onClick={stopCamera} variant="outline" disabled={status !== "scanning"} className="gap-2"><StopCircle className="h-4 w-4" /> Stop</Button>
+              <Button onClick={toggleTorch} variant="outline" disabled={!torchSupported} className="gap-2"><Flashlight className="h-4 w-4" /> {torchOn ? "Torch Off" : "Torch"}</Button>
             </div>
             {devices.length > 1 && (
               <select

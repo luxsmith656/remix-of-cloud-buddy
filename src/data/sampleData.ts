@@ -1,4 +1,4 @@
-// Sample data for Cloud Buddy.
+// Sample data for Elline's Food Product.
 
 export interface Product {
   id: string;

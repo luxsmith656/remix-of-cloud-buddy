@@ -57,7 +57,7 @@ export default function RoleManagement() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="font-heading text-3xl font-bold text-foreground">Role Management</h1>
-        <p className="text-muted-foreground mt-1">Grant or revoke admin access for registered Cloud Buddy users.</p>
+        <p className="text-muted-foreground mt-1">Grant or revoke admin access for registered Elline's Food Product users.</p>
       </div>
 
       {!isAdmin && (

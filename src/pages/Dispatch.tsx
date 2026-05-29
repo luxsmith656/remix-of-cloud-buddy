@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Tables } from "@/integrations/supabase/types";
+import { isOnline, queueSyncAction, readWithOfflineCache } from "@/lib/offlineStore";
 
 type Product = Tables<"products">;
 type Batch = Tables<"batches">;
@@ -47,30 +48,36 @@ const Dispatch = () => {
   const { data: dispatches = [], isLoading } = useQuery({
     queryKey: ["product_dispatches"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_dispatches")
-        .select("*, products(name, variant), batches(batch_code, production_date, expiration_date)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("product_dispatches", async () => {
+        const { data, error } = await supabase
+          .from("product_dispatches")
+          .select("*, products(name, variant), batches(batch_code, production_date, expiration_date)")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("products", async () => {
+        const { data, error } = await supabase.from("products").select("*").order("name");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("batches").select("*").gt("quantity_produced", 0).order("expiration_date");
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("batches", async () => {
+        const { data, error } = await supabase.from("batches").select("*").gt("quantity_produced", 0).order("expiration_date");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
@@ -99,20 +106,25 @@ const Dispatch = () => {
         throw new Error("Not enough stock in the selected batch");
       }
 
-      const { error } = await supabase.rpc("dispatch_product", {
+      const payload = {
         product_id_value: form.product_id,
         quantity_value: form.quantity,
         batch_id_value: form.batch_id === NO_BATCH ? undefined : form.batch_id,
         dispatch_type_value: form.dispatch_type,
-        destination_value: form.destination || undefined,
-        reference_number_value: form.reference_number || undefined,
-        unit_price_value: form.unit_price || undefined,
-        dispatched_date_value: form.dispatched_date || undefined,
-        notes_value: form.notes || undefined,
-      });
+        destination_value: form.destination || null,
+        reference_number_value: form.reference_number || null,
+        unit_price_value: form.unit_price || null,
+        dispatched_date_value: form.dispatched_date || null,
+        notes_value: form.notes || null,
+      };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Dispatch", actionType: "rpc", rpcName: "dispatch_product", payload });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("dispatch_product", payload);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["product_dispatches"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
@@ -121,7 +133,7 @@ const Dispatch = () => {
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
       setModalOpen(false);
       setForm(emptyForm);
-      toast.success("Product dispatched and stock deducted");
+      toast.success((result as any)?.offline ? "Dispatch saved offline - Pending Sync" : "Product dispatched and stock deducted");
     },
     onError: (error) => toast.error(error.message),
   });

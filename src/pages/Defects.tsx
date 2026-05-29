@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { logAuditAction } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
+import { isOnline, queueSyncAction, readWithOfflineCache } from "@/lib/offlineStore";
 
 const defectReasons = ["Broken Packaging", "Spoiled Material", "Machine Error", "Contamination", "Label Defect", "Other"];
 
@@ -25,18 +26,22 @@ const Defects = () => {
   const { data: defects = [], isLoading } = useQuery({
     queryKey: ["defects"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("defects").select("*, batches(*, products(*))").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("defects", async () => {
+        const { data, error } = await supabase.from("defects").select("*, batches(*, products(*))").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("batches").select("*, products(name, variant)");
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("batches", async () => {
+        const { data, error } = await supabase.from("batches").select("*, products(name, variant)");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
@@ -52,14 +57,19 @@ const Defects = () => {
       if (selectedBatch && quantity > selectedBatch.quantity_produced) {
         throw new Error("Defect quantity cannot exceed remaining batch stock");
       }
-      const { error } = await supabase.rpc("log_defect", {
+      const payload = {
         batch_id_value: batchId,
         quantity_value: quantity,
         reason_value: reason || undefined,
-      });
+      };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Defects", actionType: "rpc", rpcName: "log_defect", payload, userId: user?.id });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("log_defect", payload);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["defects"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -67,7 +77,7 @@ const Defects = () => {
       setModalOpen(false);
       setBatchId(""); setQuantity(1); setReason("");
       logAuditAction("CREATE", "Defects", `Logged defect: ${quantity} units for batch ${batchId}`, user?.id);
-      toast.success("Defect logged successfully");
+      toast.success((result as any)?.offline ? "Defect saved offline - Pending Sync" : "Defect logged successfully");
     },
     onError: (e) => toast.error(e.message),
   });

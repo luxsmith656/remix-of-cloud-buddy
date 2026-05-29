@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { logAuditAction } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
+import { isOnline, markCachedRowDeleted, queueSyncAction, readWithOfflineCache, upsertCachedRow } from "@/lib/offlineStore";
 
 type Supplier = Tables<"suppliers">;
 const emptyForm = { name: "", contact: "", email: "", address: "" };
@@ -27,14 +28,30 @@ const Suppliers = () => {
   const { data: suppliers = [], isLoading } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("suppliers").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("suppliers", async () => {
+        const { data, error } = await supabase.from("suppliers").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const upsertMutation = useMutation({
     mutationFn: async (p: any) => {
+      if (!isOnline()) {
+        const offlineRow = { ...p, id: p.id || `local-${crypto.randomUUID()}`, sync_status: "Pending Sync" };
+        await upsertCachedRow("suppliers", offlineRow, true);
+        await queueSyncAction({
+          module: "Suppliers",
+          actionType: "table-upsert",
+          table: "suppliers",
+          payload: offlineRow,
+          localId: offlineRow.id,
+          userId: user?.id,
+          expectedUpdatedAt: editing?.updated_at ?? null,
+        });
+        return { offline: true };
+      }
       if (p.id) {
         const { error } = await supabase.from("suppliers").update(p).eq("id", p.id);
         if (error) throw error;
@@ -43,7 +60,7 @@ const Suppliers = () => {
         if (error) throw error;
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       setModalOpen(false); setEditing(null); setForm(emptyForm);
       const action = variables.id ? "UPDATE" : "CREATE";
@@ -51,22 +68,34 @@ const Suppliers = () => {
         ? `Updated supplier: ${variables.name}`
         : `Created supplier: ${variables.name}`;
       logAuditAction(action, "Suppliers", details, user?.id);
-      toast.success(editing ? "Supplier updated" : "Supplier added");
+      toast.success((result as any)?.offline ? "Supplier saved offline - Pending Sync" : editing ? "Supplier updated" : "Supplier added");
     },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (!isOnline()) {
+        await markCachedRowDeleted("suppliers", id);
+        await queueSyncAction({
+          module: "Suppliers",
+          actionType: "table-delete",
+          table: "suppliers",
+          payload: { id },
+          localId: id,
+          userId: user?.id,
+        });
+        return { offline: true };
+      }
       const { error } = await supabase.from("suppliers").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, deletedId) => {
+    onSuccess: (result, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       setDeleteConfirm(null);
       const deletedSupplier = suppliers.find(s => s.id === deletedId);
       logAuditAction("DELETE", "Suppliers", `Deleted supplier: ${deletedSupplier?.name || 'Unknown'}`, user?.id);
-      toast.success("Supplier deleted");
+      toast.success((result as any)?.offline ? "Supplier delete saved offline - Pending Sync" : "Supplier deleted");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -107,6 +136,7 @@ const Suppliers = () => {
               <CardContent className="p-5 space-y-3">
                 <div className="flex justify-between items-start">
                   <p className="font-medium text-foreground">{s.name}</p>
+                  {(s as any).sync_status && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">{(s as any).sync_status}</span>}
                   <div className="flex gap-1">
                     <button onClick={() => openEdit(s)} className="text-muted-foreground hover:text-foreground p-1"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => setDeleteConfirm(s.id)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-4 w-4" /></button>

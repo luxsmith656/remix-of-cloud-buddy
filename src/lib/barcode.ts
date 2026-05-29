@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+
 const CODE128_PATTERNS = [
   "212222","222122","222221","121223","121322","131222","122213","122312","132212","221213",
   "221312","231212","112232","122132","122231","113222","123122","123221","223211","221132",
@@ -54,4 +56,16 @@ export function code128SvgDataUri(value: string, height = 54): string {
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x} ${height}" preserveAspectRatio="none">${rects.join("")}</svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+export async function qrCodeDataUri(value: string): Promise<string> {
+  return QRCode.toDataURL(normalizeBarcodeToken(value), {
+    errorCorrectionLevel: "H",
+    margin: 3,
+    scale: 8,
+    color: {
+      dark: "#000000",
+      light: "#ffffff",
+    },
+  });
 }

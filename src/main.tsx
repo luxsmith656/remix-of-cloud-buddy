@@ -1,4 +1,4 @@
-// Cloud Buddy - Inventory Management System
+// Elline's Food Product - Inventory Management System
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { hasSupabaseConfig } from "./integrations/supabase/config";
@@ -12,7 +12,7 @@ const root = createRoot(document.getElementById("root")!);
 // one-time hard reload so the browser fetches the fresh index.html + chunks.
 if (typeof window !== "undefined") {
   const reloadOnce = () => {
-    const key = "cb-chunk-reload";
+    const key = "elline-chunk-reload";
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
     window.location.reload();
@@ -38,7 +38,7 @@ if (!hasSupabaseConfig) {
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Configuration Required</p>
         <h1 className="font-heading text-2xl font-bold mt-2">Supabase environment variables are missing</h1>
         <p className="text-sm text-muted-foreground mt-3">
-          Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in the deployment environment, then redeploy Cloud Buddy.
+          Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in the deployment environment, then redeploy Elline's Food Product.
         </p>
       </div>
     </div>,

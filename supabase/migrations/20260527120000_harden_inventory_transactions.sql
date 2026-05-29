@@ -1,4 +1,4 @@
--- Harden Cloud Buddy inventory consistency, storage access, and computed stock status.
+-- Harden Elline's Food Product inventory consistency, storage access, and computed stock status.
 
 -- Keep product status derived from stock and expiration so the UI cannot drift.
 CREATE OR REPLACE FUNCTION public.compute_product_status(

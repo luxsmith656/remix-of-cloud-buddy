@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { code128SvgDataUri } from "@/lib/barcode";
+import { code128SvgDataUri, qrCodeDataUri } from "@/lib/barcode";
 
 const ALL = "all";
 
@@ -18,8 +18,8 @@ const BarcodePrinting = () => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [copies, setCopies] = useState(1);
-  const [columns, setColumns] = useState(3);
-  const [labelSize, setLabelSize] = useState("small");
+  const [columns, setColumns] = useState(2);
+  const [labelSize, setLabelSize] = useState("large");
   const [showProduct, setShowProduct] = useState(true);
   const [showExpiry, setShowExpiry] = useState(true);
   const [showPrice, setShowPrice] = useState(true);
@@ -55,7 +55,8 @@ const BarcodePrinting = () => {
   }, [batches, dateFrom, dateTo, productId, status]);
 
   const labels = filteredBatches.flatMap((batch: any) => Array.from({ length: copies }, (_, copyIndex) => ({ ...batch, printKey: `${batch.id}-${copyIndex}` })));
-  const labelClass = labelSize === "large" ? "min-h-[128px]" : labelSize === "medium" ? "min-h-[104px]" : "min-h-[82px]";
+  const labelClass = labelSize === "large" ? "min-h-[210px]" : labelSize === "medium" ? "min-h-[168px]" : "min-h-[130px]";
+  const barcodeHeight = labelSize === "large" ? 96 : labelSize === "medium" ? 78 : 62;
 
   return (
     <div className="space-y-6 animate-fade-in barcode-print-page">
@@ -72,7 +73,7 @@ const BarcodePrinting = () => {
       <div className="barcode-print-controls flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-3xl font-bold text-foreground">Barcode Printing</h1>
-          <p className="text-muted-foreground mt-1">Print compact token-only Code 128 labels for production batches.</p>
+          <p className="text-muted-foreground mt-1">Print high-contrast Code 128 and QR batch labels for easier scanning.</p>
         </div>
         <Button onClick={() => window.print()} className="bg-primary text-primary-foreground gap-2"><Printer className="h-4 w-4" /> Print Labels</Button>
       </div>
@@ -114,9 +115,9 @@ const BarcodePrinting = () => {
             <Select value={labelSize} onValueChange={setLabelSize}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="small">Small</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="large">Large</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="small">Small</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -146,11 +147,21 @@ const BarcodePrinting = () => {
           ) : (
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
               {labels.map((batch: any) => (
-                <div key={batch.printKey} className={`barcode-label rounded border border-border p-2 text-center ${labelClass}`}>
-                  {showProduct && <p className="truncate text-[11px] font-semibold">{batch.products?.name || "Product"} {batch.products?.variant ? `(${batch.products.variant})` : ""}</p>}
-                  <img src={code128SvgDataUri(batch.barcode_token || batch.batch_code)} alt={batch.batch_code} className="mx-auto h-9 w-full max-w-[220px]" />
-                  <p className="text-[9px] font-mono break-all">{batch.batch_code}</p>
-                  <div className="mt-1 grid grid-cols-2 gap-x-2 text-[9px] text-muted-foreground">
+                <div key={batch.printKey} className={`barcode-label rounded border-2 border-black bg-white p-3 text-center text-black ${labelClass}`}>
+                  {showProduct && <p className="truncate text-sm font-bold text-black">{batch.products?.name || "Product"} {batch.products?.variant ? `(${batch.products.variant})` : ""}</p>}
+                  <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-3">
+                    <div className="rounded bg-white px-3 py-2">
+                      <img
+                        src={code128SvgDataUri(batch.barcode_token || batch.batch_code, barcodeHeight)}
+                        alt={batch.batch_code}
+                        className="mx-auto w-full max-w-[360px]"
+                        style={{ height: barcodeHeight }}
+                      />
+                    </div>
+                    <QrCode token={batch.barcode_token || batch.batch_code} />
+                  </div>
+                  <p className="mt-2 text-base font-black tracking-wide text-black break-all">{batch.batch_code}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-x-2 text-[11px] font-semibold text-black">
                     {showManufactured && <span>MFG {batch.manufactured_date || batch.production_date}</span>}
                     {showExpiry && <span>EXP {batch.expiration_date || "-"}</span>}
                     {showPrice && <span className="col-span-2">SRP {batch.price ? batch.price.toLocaleString(undefined, { style: "currency", currency: "PHP" }) : "-"}</span>}
@@ -172,6 +183,21 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       {label}
     </label>
   );
+}
+
+function QrCode({ token }: { token: string }) {
+  const [src, setSrc] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    qrCodeDataUri(token).then((dataUri) => {
+      if (mounted) setSrc(dataUri);
+    });
+    return () => { mounted = false; };
+  }, [token]);
+
+  if (!src) return <div className="h-24 w-24 bg-white" aria-hidden="true" />;
+  return <img src={src} alt={`QR ${token}`} className="h-24 w-24 bg-white" />;
 }
 
 export default BarcodePrinting;

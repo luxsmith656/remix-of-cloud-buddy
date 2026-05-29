@@ -1,4 +1,4 @@
--- Harden Cloud Buddy inventory consistency, storage access, and computed stock status.
+-- Harden Elline's Food Product inventory consistency, storage access, and computed stock status.
 
 CREATE OR REPLACE FUNCTION public.compute_product_status(
   quantity_value integer,

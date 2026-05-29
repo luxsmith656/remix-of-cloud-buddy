@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { readWithOfflineCache } from "@/lib/offlineStore";
 
 const actionColors: Record<string, string> = {
   CREATE: "bg-success/10 text-success",
@@ -14,9 +15,11 @@ const AuditLogs = () => {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["audit_logs"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("audit_logs").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("audit_logs", async () => {
+        const { data, error } = await supabase.from("audit_logs").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
@@ -45,7 +48,10 @@ const AuditLogs = () => {
                     <td className="p-4 text-sm text-foreground">{l.user_name || "System"}</td>
                     <td className="p-4"><span className={`text-xs font-medium px-2 py-1 rounded-full ${actionColors[l.action] || ""}`}>{l.action}</span></td>
                     <td className="p-4 text-sm text-muted-foreground">{l.module}</td>
-                    <td className="p-4 text-sm text-muted-foreground max-w-xs truncate">{l.details}</td>
+                    <td className="p-4 text-sm text-muted-foreground max-w-xs truncate">
+                      {l.details}
+                      {(l as any).sync_status && <span className="ml-2 rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">{(l as any).sync_status}</span>}
+                    </td>
                     <td className="p-4 text-sm text-muted-foreground">{new Date(l.created_at).toLocaleString()}</td>
                   </tr>
                 ))}

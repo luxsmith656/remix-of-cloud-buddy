@@ -4,7 +4,7 @@ import { csvEscape, escapeHtml, isWithinDateRange, rowsToCsv } from "./reports";
 describe("report export helpers", () => {
   it("escapes CSV values and prevents spreadsheet formula injection", () => {
     expect(csvEscape("=IMPORTXML(\"http://bad\")")).toBe("\"'=IMPORTXML(\"\"http://bad\"\")\"");
-    expect(rowsToCsv([{ Name: "Cloud Buddy", Notes: "safe, quoted" }])).toContain("\"safe, quoted\"");
+    expect(rowsToCsv([{ Name: "Elline's Food Product", Notes: "safe, quoted" }])).toContain("\"safe, quoted\"");
   });
 
   it("escapes HTML used in print reports", () => {

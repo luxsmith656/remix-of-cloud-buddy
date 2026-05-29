@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { Enums } from "@/integrations/supabase/types";
+import { isOnline, queueSyncAction, readWithOfflineCache } from "@/lib/offlineStore";
 
 const typeIcons = { IN: ArrowDown, OUT: ArrowUp, ADJUSTMENT: RefreshCw };
 const typeStyles = { IN: "text-success", OUT: "text-destructive", ADJUSTMENT: "text-warning" };
@@ -27,20 +28,22 @@ const StockMovements = () => {
   const { data: movements = [], isLoading } = useQuery({
     queryKey: ["stock_movements"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("stock_movements").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("stock_movements", async () => {
+        const { data, error } = await supabase.from("stock_movements").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: ingredients = [] } = useQuery({
     queryKey: ["ingredients"],
-    queryFn: async () => { const { data } = await supabase.from("ingredients").select("*"); return data || []; },
+    queryFn: async () => readWithOfflineCache("ingredients", async () => { const { data } = await supabase.from("ingredients").select("*"); return data || []; }),
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => { const { data } = await supabase.from("products").select("*"); return data || []; },
+    queryFn: async () => readWithOfflineCache("products", async () => { const { data } = await supabase.from("products").select("*"); return data || []; }),
   });
 
   const items = itemType === "ingredient" ? ingredients : products;
@@ -50,22 +53,27 @@ const StockMovements = () => {
       if (qty <= 0) throw new Error("Quantity must be positive");
       const actualQty = moveType === "OUT" ? -qty : qty;
 
-      const { error } = await supabase.rpc("request_inventory_adjustment", {
+      const payload = {
         item_type_value: itemType,
         item_id_value: itemId,
         quantity_value: actualQty,
         reason_value: remarks || `${moveType} adjustment request`,
-      });
+      };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Stock Movements", actionType: "rpc", rpcName: "request_inventory_adjustment", payload });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("request_inventory_adjustment", payload);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["stock_movements"] });
       queryClient.invalidateQueries({ queryKey: ["inventory_adjustment_requests"] });
       queryClient.invalidateQueries({ queryKey: ["ingredients"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setModalOpen(false);
       setItemId(""); setQty(1); setRemarks("");
-      toast.success("Adjustment request submitted for approval");
+      toast.success((result as any)?.offline ? "Adjustment request saved offline - Pending Sync" : "Adjustment request submitted for approval");
     },
     onError: (e) => toast.error(e.message),
   });

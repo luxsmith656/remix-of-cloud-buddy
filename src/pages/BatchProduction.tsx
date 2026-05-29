@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle, ArrowRight, Factory } from "lucide-react";
 import { generateBatchCode, normalizeBarcodeToken } from "@/lib/barcode";
+import { isOnline, queueSyncAction, readWithOfflineCache } from "@/lib/offlineStore";
 
 const batchStatusStyles: Record<string, string> = {
   planned: "bg-info/10 text-info border-info/20",
@@ -38,27 +39,33 @@ const BatchProduction = () => {
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("products", async () => {
+        const { data, error } = await supabase.from("products").select("*").order("name");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: batches = [], isLoading } = useQuery({
     queryKey: ["batches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("batches").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("batches", async () => {
+        const { data, error } = await supabase.from("batches").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: recipes = [] } = useQuery({
     queryKey: ["recipes-with-ingredients"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("recipes").select("*, recipe_ingredients(*, ingredients(*))");
-      if (error) throw error;
-      return data;
+      return readWithOfflineCache("recipes", async () => {
+        const { data, error } = await supabase.from("recipes").select("*, recipe_ingredients(*, ingredients(*))");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
@@ -129,16 +136,21 @@ const BatchProduction = () => {
     mutationFn: async () => {
       if (!selectedProduct) throw new Error("Select a product");
       if (!expirationDate) throw new Error("Expiration date is required");
-      const { error } = await supabase.rpc("produce_batch", {
+      const payload = {
         product_id_value: selectedProduct,
         quantity_value: quantity,
         production_date_value: productionDate,
         expiration_date_value: expirationDate,
-        batch_code_value: batchCode.trim() || undefined,
-      });
+        batch_code_value: batchCode.trim() || null,
+      };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Batch Production", actionType: "rpc", rpcName: "produce_batch", payload });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("produce_batch", payload);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["ingredients"] });
@@ -146,7 +158,7 @@ const BatchProduction = () => {
       queryClient.invalidateQueries({ queryKey: ["inventory_activity"] });
       setWizardOpen(false);
       resetWizard();
-      toast.success("Batch created successfully. Ingredients deducted and product stock updated.");
+      toast.success((result as any)?.offline ? "Batch production saved offline - Pending Sync" : "Batch created successfully. Ingredients deducted and product stock updated.");
     },
     onError: (error) => toast.error(error.message),
   });

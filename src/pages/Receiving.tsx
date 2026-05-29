@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Tables } from "@/integrations/supabase/types";
+import { isOnline, queueSyncAction, readWithOfflineCache } from "@/lib/offlineStore";
 
 type Ingredient = Tables<"ingredients">;
 type Supplier = Tables<"suppliers">;
@@ -38,30 +39,36 @@ const Receiving = () => {
   const { data: receipts = [], isLoading } = useQuery({
     queryKey: ["ingredient_receipts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ingredient_receipts")
-        .select("*, ingredients(name, unit), suppliers(name)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("ingredient_receipts", async () => {
+        const { data, error } = await supabase
+          .from("ingredient_receipts")
+          .select("*, ingredients(name, unit), suppliers(name)")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: ingredients = [] } = useQuery({
     queryKey: ["ingredients"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("ingredients").select("*").order("name");
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("ingredients", async () => {
+        const { data, error } = await supabase.from("ingredients").select("*").order("name");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("suppliers").select("*").order("name");
-      if (error) throw error;
-      return data || [];
+      return readWithOfflineCache("suppliers", async () => {
+        const { data, error } = await supabase.from("suppliers").select("*").order("name");
+        if (error) throw error;
+        return data || [];
+      });
     },
   });
 
@@ -76,27 +83,32 @@ const Receiving = () => {
       if (form.quantity <= 0) throw new Error("Quantity must be greater than zero");
       if (form.unit_cost < 0) throw new Error("Unit cost cannot be negative");
 
-      const { error } = await supabase.rpc("receive_ingredient", {
+      const payload = {
         ingredient_id_value: form.ingredient_id,
         quantity_value: form.quantity,
-        supplier_id_value: form.supplier_id === NO_SUPPLIER ? undefined : form.supplier_id,
-        unit_cost_value: form.unit_cost || undefined,
-        lot_number_value: form.lot_number || undefined,
-        invoice_number_value: form.invoice_number || undefined,
-        received_date_value: form.received_date || undefined,
-        expiration_date_value: form.expiration_date || undefined,
-        notes_value: form.notes || undefined,
-      });
+        supplier_id_value: form.supplier_id === NO_SUPPLIER ? null : form.supplier_id,
+        unit_cost_value: form.unit_cost || null,
+        lot_number_value: form.lot_number || null,
+        invoice_number_value: form.invoice_number || null,
+        received_date_value: form.received_date || null,
+        expiration_date_value: form.expiration_date || null,
+        notes_value: form.notes || null,
+      };
+      if (!isOnline()) {
+        await queueSyncAction({ module: "Receiving", actionType: "rpc", rpcName: "receive_ingredient", payload });
+        return { offline: true };
+      }
+      const { error } = await supabase.rpc("receive_ingredient", payload);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["ingredient_receipts"] });
       queryClient.invalidateQueries({ queryKey: ["ingredients"] });
       queryClient.invalidateQueries({ queryKey: ["stock_movements"] });
       queryClient.invalidateQueries({ queryKey: ["inventory_activity"] });
       setModalOpen(false);
       setForm(emptyForm);
-      toast.success("Ingredient received and stock updated");
+      toast.success((result as any)?.offline ? "Receiving saved offline - Pending Sync" : "Ingredient received and stock updated");
     },
     onError: (error) => toast.error(error.message),
   });

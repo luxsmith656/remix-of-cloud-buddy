@@ -1,6 +1,6 @@
-# Cloud Buddy
+# Elline's Food Product
 
-Cloud Buddy is a React, Vite, TypeScript, Tailwind, shadcn/ui, and Supabase inventory management app for products, ingredients, suppliers, recipes, ingredient receiving, batch production, product dispatch, defects, stock movements, adjustment approvals, alerts, reports, activity history, roles, and audit logs.
+Elline's Food Product is a React, Vite, TypeScript, Tailwind, shadcn/ui, and Supabase inventory management app for products, ingredients, suppliers, recipes, ingredient receiving, batch production, product dispatch, defects, stock movements, adjustment approvals, alerts, reports, activity history, roles, and audit logs.
 
 <!-- GitHub sync verification: 2026-05-28 -->
 
@@ -30,7 +30,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-key
 
 Never commit `.env`, `.env.local`, service-role keys, JWT secrets, or database URLs. A real Supabase anon key was previously committed, so rotate the exposed anon key/JWT secret in Supabase before treating the project as production-safe.
 
-The browser publishable Supabase key is not a service-role secret and is included in frontend builds, but it still must be provided through `.env.local`, Vercel, or Lovable environment variables. The app intentionally shows a configuration-required screen when those variables are missing.
+The browser publishable Supabase key is not a service-role secret and is included in frontend builds, but it still must be provided through `.env.local`, Vercel, or Lovable environment variables. The local client also preserves the configured fallback values used by the current Lovable/Vercel project.
 
 ## Supabase Setup
 
@@ -92,9 +92,13 @@ The PWA/security hardening migration adds:
 
 ## PWA And Offline
 
-Cloud Buddy is configured as a PWA through `vite-plugin-pwa`, with app icons, a web manifest, service-worker precaching, stale chunk recovery after deploys, and a status bar for offline/update states.
+Elline's Food Product is configured as a PWA through `vite-plugin-pwa`, with app icons, a web manifest, service-worker precaching, stale chunk recovery after deploys, and a status bar for offline/update states.
 
-Offline support is intentionally read-only for inventory safety. The barcode scanner syncs batch lookup records into IndexedDB while online, supports manual sync, refreshes on reconnect, and can resolve synced batch tokens offline. Stock-changing actions such as production, receiving, dispatch, defects, and adjustments still require Supabase so inventory transactions stay atomic and conflict-free.
+Offline support uses IndexedDB for cached records and a local sync queue. The app shell, assets, navigation fallback, Supabase storage assets, and Supabase REST reads are service-worker cached. The app also caches important tables such as products, ingredients, batches, recipes, suppliers, receiving records, dispatch records, audit logs, and local role/admin metadata for offline viewing.
+
+Offline create, update, delete, receiving, dispatch, batch production, recipe, defect, and audit actions are saved as Pending Sync. When the connection returns, the queue replays in order. Simple table updates use `updated_at` conflict checks when available. Inventory-sensitive actions are replayed through Supabase RPCs, so the server still validates stock and batch state before accepting the change. Failed or conflicting sync items remain marked Sync Failed for admin review instead of being silently accepted.
+
+The barcode scanner syncs batch lookup records into IndexedDB while online, supports manual sync, refreshes on reconnect, and can resolve synced batch tokens offline. Scanner labels include both Code 128 and QR tokens; the token contains only the internal batch code, not product details.
 
 If you use Lovable for Supabase changes, paste the prompt in `LOVABLE-SUPABASE-PROMPT.md`.
 
@@ -130,7 +134,7 @@ All of these should pass before deployment.
 4. Run `npm ci`, `npm run build`, and deploy the generated `dist` folder.
 5. Confirm storage bucket policies and RLS policies in Supabase Dashboard.
 
-Only describe Cloud Buddy as fully deployed on Vercel after the live URL loads with valid Supabase variables:
+Only describe Elline's Food Product as fully deployed on Vercel after the live URL loads with valid Supabase variables:
 
 ```bash
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
@@ -142,7 +146,8 @@ If the Vercel site still shows missing configuration or "configuration required,
 ## Known Limitations
 
 - Broader end-to-end tests for authenticated CRUD flows still need a seeded Supabase test project.
-- Camera scanning depends on browser support for the BarcodeDetector API. USB scanners and manual barcode search are supported as fallback paths.
+- Camera scanning depends on browser camera and ZXing support. Code 128 and QR are prioritized, with USB scanners and manual barcode search as fallback paths.
+- Offline sync should still be tested against a seeded Supabase staging project for multi-device conflicts and inventory edge cases before real production use.
 - Batch-level FEFO allocation is possible through dispatch batch selection, but automatic FEFO picking is still a recommended improvement.
 - Broader import/export workflows, backup automation, external monitoring, scheduled alert jobs, email/SMS notifications, barcode hardware testing, audit dashboards, and approval workflows for high-value dispatches are recommended next improvements.
 

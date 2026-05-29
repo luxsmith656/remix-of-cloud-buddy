@@ -51,11 +51,11 @@ const Login = () => {
       <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-center items-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent via-accent to-secondary/30" />
         <div className="relative z-10 text-center">
-          <img src={ellineLogo} alt="Cloud Buddy" width={160} height={160} className="mx-auto mb-6" />
-          <h2 className="text-lg font-body font-medium text-muted-foreground mb-4">Cloud Buddy</h2>
+          <img src={ellineLogo} alt="Elline's Food Product" width={160} height={160} className="mx-auto mb-6" />
+          <h2 className="text-lg font-body font-medium text-muted-foreground mb-4">Elline's Food Product</h2>
           <h1 className="font-heading text-5xl font-bold text-foreground leading-tight">
             Login to<br />
-            <span className="text-primary">Inventory</span>
+            <span className="text-primary">System</span>
           </h1>
         </div>
       </div>
@@ -64,7 +64,7 @@ const Login = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-card">
         <div className="w-full max-w-md space-y-8">
           <div className="lg:hidden flex justify-center mb-4">
-            <img src={ellineLogo} alt="Cloud Buddy" width={80} height={80} />
+            <img src={ellineLogo} alt="Elline's Food Product" width={80} height={80} />
           </div>
           <div>
             <h2 className="font-heading text-3xl font-bold text-foreground">

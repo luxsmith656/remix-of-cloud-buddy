@@ -92,7 +92,7 @@ const Reports = () => {
   const generateInventory = (format: "csv" | "pdf") => {
     const rows = [
       ...products.map(p => ({ Type: "Product", Name: p.name, Barcode: p.barcode || "-", Variant: p.variant || "-", Stock: p.quantity, "Min Stock": p.min_stock, Unit: "units", "Unit Price": p.unit_price, "Est. Unit Cost": p.estimated_unit_cost, Status: computeProductStatus(p.quantity, p.min_stock, p.expiration_date), Expiration: p.expiration_date || "-" })),
-      ...ingredients.map(i => ({ Type: "Ingredient", Name: i.name, Barcode: i.barcode || "-", Variant: "-", Stock: i.current_stock, "Min Stock": i.min_stock, Unit: i.unit, "Unit Price": "-", "Est. Unit Cost": i.unit_cost, Status: i.current_stock <= i.min_stock ? "low-stock" : "ok", Expiration: i.expiration_date || "-" })),
+      ...ingredients.map(i => ({ Type: "Ingredient", Name: i.name, Variant: "-", Stock: i.current_stock, "Min Stock": i.min_stock, Unit: i.unit, "Unit Price": "-", "Est. Unit Cost": i.unit_cost, Status: i.current_stock <= i.min_stock ? "low-stock" : "ok", Expiration: i.expiration_date || "-" })),
     ];
     if (format === "csv") downloadCSV(rows, "inventory_summary.csv");
     else downloadPDF("Inventory Summary Report", rows);

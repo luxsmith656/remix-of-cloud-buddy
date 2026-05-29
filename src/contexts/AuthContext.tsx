@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { getOfflineMeta, isOnline, setOfflineMeta } from "@/lib/offlineStore";
 
 interface AuthContextType {
   user: User | null;
@@ -21,7 +22,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const checkAdmin = async (userId: string) => {
+  const checkAdmin = useCallback(async (userId: string) => {
+    if (!isOnline()) {
+      const cachedAdmin = Boolean(await getOfflineMeta<boolean>(`roles:${userId}:admin`));
+      setIsAdmin(cachedAdmin);
+      return cachedAdmin;
+    }
     const { data, error } = await supabase
       .from("user_roles")
       .select("id")
@@ -30,36 +36,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (error) {
-      setIsAdmin(false);
-      return;
+      const cachedAdmin = Boolean(await getOfflineMeta<boolean>(`roles:${userId}:admin`));
+      setIsAdmin(cachedAdmin);
+      return cachedAdmin;
     }
 
     setIsAdmin(!!data);
-  };
+    await setOfflineMeta(`roles:${userId}:admin`, !!data);
+    return !!data;
+  }, []);
+
+  const applySession = useCallback(async (nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+    if (nextSession?.user) {
+      await checkAdmin(nextSession.user.id);
+    } else {
+      setIsAdmin(false);
+    }
+    setIsLoading(false);
+  }, [checkAdmin]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setTimeout(() => checkAdmin(session.user.id), 0);
-      } else {
-        setIsAdmin(false);
-      }
-      setIsLoading(false);
+      setIsLoading(true);
+      void applySession(session);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        checkAdmin(session.user.id);
-      }
-      setIsLoading(false);
+      void applySession(session);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [applySession]);
 
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
