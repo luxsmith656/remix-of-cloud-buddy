@@ -121,7 +121,7 @@ const Dispatch = () => {
         await queueSyncAction({ module: "Dispatch", actionType: "rpc", rpcName: "dispatch_product", payload });
         return { offline: true };
       }
-      const { error } = await supabase.rpc("dispatch_product", payload);
+      const { error } = await supabase.rpc("dispatch_product", payload as any);
       if (error) throw error;
     },
     onSuccess: (result) => {

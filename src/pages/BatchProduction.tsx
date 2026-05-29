@@ -147,7 +147,7 @@ const BatchProduction = () => {
         await queueSyncAction({ module: "Batch Production", actionType: "rpc", rpcName: "produce_batch", payload });
         return { offline: true };
       }
-      const { error } = await supabase.rpc("produce_batch", payload);
+      const { error } = await supabase.rpc("produce_batch", payload as any);
       if (error) throw error;
     },
     onSuccess: (result) => {
