@@ -173,7 +173,7 @@ const Dispatch = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {"Product", "Qty", "Type", "Destination", "Reference", "Dispatched", "Batch Barcode"}.map((header) => (
+                  {["Product", "Qty", "Type", "Destination", "Reference", "Dispatched", "Batch Barcode"].map((header) => (
                     <th key={header} className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{header}</th>
                   ))}
                 </tr>
