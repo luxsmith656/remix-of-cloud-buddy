@@ -25,12 +25,12 @@ const navItems = [
   { title: "Defects", url: "/defects", icon: ShieldAlert },
   { title: "Stock In/Out", url: "/stock-movements", icon: ArrowLeftRight },
   { title: "Adjustments", url: "/adjustments", icon: ClipboardCheck },
-  { title: "Activity", url: "/activity", icon: History },
   { title: "Barcode Scanner", url: "/barcode-scanner", icon: ScanBarcode },
   { title: "Barcode Printing", url: "/barcode-printing", icon: Barcode },
+  { title: "Activity", url: "/activity", icon: History },
   { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Reports", url: "/reports", icon: BarChart3 },
-  { title: "Audit Logs", url: "/audit-logs", icon: ClipboardList },
+  { title: "Finance Logs", url: "/audit-logs", icon: ClipboardList },
   { title: "Roles", url: "/roles", icon: UserCog },
 ];
 
