@@ -89,7 +89,7 @@ const Recipes = () => {
         await queueSyncAction({ module: "Recipes", actionType: "rpc", rpcName: "save_recipe", payload, userId: user?.id });
         return { offline: true };
       }
-      const { error } = await supabase.rpc("save_recipe", payload);
+      const { error } = await supabase.rpc("save_recipe", payload as any);
       if (error) throw error;
     },
     onSuccess: (result) => {
