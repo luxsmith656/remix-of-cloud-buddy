@@ -31,8 +31,6 @@ const Login = () => {
     }
     setLoading(true);
     try {
-    setLoading(true);
-    try {
       if (isSignUp) {
         const { error } = await signup(email, password, username);
         if (error) { setError(error); return; }
@@ -63,6 +61,9 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  return (
+    <div className="min-h-screen flex">
 
       {/* Left Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-center items-center p-12 relative overflow-hidden">
