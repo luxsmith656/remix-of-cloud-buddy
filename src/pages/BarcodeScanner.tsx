@@ -12,10 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { normalizeBarcodeToken } from "@/lib/barcode";
 import { cacheBatch, cacheBatches, getCachedBatch, getMeta } from "@/lib/offlineCache";
 
-type ScanStatus = "ready" | "scanning" | "checking" | "found" | "not-found" | "unreadable" | "expired" | "near-expiry" | "defective" | "no-camera-permission" | "database-error";
+type ScanStatus = "ready" | "requesting-camera" | "scanning" | "checking" | "found" | "not-found" | "unreadable" | "expired" | "near-expiry" | "defective" | "no-camera-permission" | "database-error";
 
 const statusLabels: Record<ScanStatus, string> = {
   ready: "Ready to scan",
+  "requesting-camera": "Allow camera access when prompted",
   scanning: "Scanning... hold barcode inside the box",
   checking: "Barcode detected, checking batch...",
   found: "Batch found",
@@ -70,6 +71,7 @@ const BarcodeScanner = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const scanTimeoutRef = useRef<number | null>(null);
   const lastScannedRef = useRef<{ value: string; at: number } | null>(null);
   const [fromCache, setFromCache] = useState(false);
@@ -148,25 +150,32 @@ const BarcodeScanner = () => {
     },
   });
 
+  const stopActiveStream = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  };
+
   const stopCamera = () => {
     if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
     scanTimeoutRef.current = null;
     try { controlsRef.current?.stop(); } catch { /* noop */ }
     controlsRef.current = null;
+    stopActiveStream();
     setTorchOn(false);
     setTorchSupported(false);
     setStatus(batch ? getBatchStatus(batch) : "ready");
   };
 
   const updateTorchSupport = () => {
-    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const stream = cameraStreamRef.current ?? (videoRef.current?.srcObject as MediaStream | null);
     const track = stream?.getVideoTracks()[0];
     const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
     setTorchSupported(Boolean(capabilities?.torch));
   };
 
   const toggleTorch = async () => {
-    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const stream = cameraStreamRef.current ?? (videoRef.current?.srcObject as MediaStream | null);
     const track = stream?.getVideoTracks()[0];
     if (!track) return;
     try {
@@ -188,23 +197,8 @@ const BarcodeScanner = () => {
       toast.error("This browser does not expose a camera. Use manual search or a USB scanner.");
       return;
     }
+    if (!videoRef.current) return;
     try {
-      // Explicitly request camera permission inside the user-gesture handler
-      // so the browser shows the permission prompt (some PWAs/iframes silently
-      // report "denied" if getUserMedia is wrapped too deep in a library call).
-      try {
-        const probe = await navigator.mediaDevices.getUserMedia({
-          video: deviceId
-            ? { deviceId: { exact: deviceId } }
-            : { facingMode: { ideal: "environment" } },
-          audio: false,
-        });
-        // Release the probe stream; zxing will re-acquire with full constraints.
-        probe.getTracks().forEach((t) => t.stop());
-      } catch (permErr: any) {
-        throw permErr;
-      }
-
       if (!readerRef.current) {
         const hints = new Map();
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -219,19 +213,34 @@ const BarcodeScanner = () => {
       video.setAttribute("playsinline", "true");
       video.muted = true;
 
-      const constraints: MediaStreamConstraints = deviceId
-        ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }, audio: false }
-        : { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }, audio: false };
+      stopCamera();
+      setStatus("requesting-camera");
+
+      const videoConstraints: MediaTrackConstraints = deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+
+      // Keep getUserMedia directly in this click handler and reuse the same stream
+      // for ZXing. Re-acquiring a second stream can fail in installed PWAs on some devices.
+      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+      cameraStreamRef.current = stream;
+      video.srcObject = stream;
+      try {
+        await video.play();
+      } catch {
+        // Some browsers start playback automatically once metadata is ready.
+      }
 
       setStatus("scanning");
       scanTimeoutRef.current = window.setTimeout(() => {
         if (status !== "checking" && controlsRef.current) setStatus("unreadable");
       }, 10_000);
 
-      const controls = await readerRef.current.decodeFromConstraints(constraints, video, (result, err, ctrl) => {
+      const controls = await readerRef.current.decodeFromStream(stream, video, (result, err, ctrl) => {
         if (result) {
           try { ctrl.stop(); } catch { /* noop */ }
           controlsRef.current = null;
+          stopActiveStream();
           if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
           scanTimeoutRef.current = null;
           const value = normalizeBarcodeToken(result.getText());
@@ -253,10 +262,11 @@ const BarcodeScanner = () => {
         setDevices(list);
       } catch { /* noop */ }
     } catch (err: any) {
+      stopActiveStream();
       const name = err?.name || "";
       if (name === "NotAllowedError" || name === "SecurityError") {
         setStatus("no-camera-permission");
-        toast.error("Camera permission denied. Allow camera access in browser settings.");
+        toast.error("Camera is blocked. Tap the browser lock/site settings and allow Camera, then scan again.");
       } else if (name === "NotFoundError" || name === "OverconstrainedError") {
         toast.error("No suitable camera found on this device.");
         setStatus("ready");
@@ -271,6 +281,8 @@ const BarcodeScanner = () => {
     if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
     try { controlsRef.current?.stop(); } catch { /* noop */ }
     controlsRef.current = null;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
   }, []);
 
   useEffect(() => {
