@@ -112,8 +112,26 @@ const Recipes = () => {
         await queueSyncAction({ module: "Recipes", actionType: "rpc", rpcName: "delete_recipe", payload, userId: user?.id });
         return { offline: true };
       }
-      const { error } = await supabase.rpc("delete_recipe", payload);
-      if (error) throw error;
+      const { error } = await supabase.rpc("delete_recipe", payload as any);
+      if (!error) return;
+
+      const isStaleSchemaCacheError =
+        error.message?.includes("delete_recipe") &&
+        error.message?.includes("schema cache");
+
+      if (!isStaleSchemaCacheError) throw error;
+
+      const { error: ingredientsError } = await supabase
+        .from("recipe_ingredients")
+        .delete()
+        .eq("recipe_id", id);
+      if (ingredientsError) throw ingredientsError;
+
+      const { error: recipeError } = await supabase
+        .from("recipes")
+        .delete()
+        .eq("id", id);
+      if (recipeError) throw recipeError;
     },
     onSuccess: (result, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["recipes-full"] });
