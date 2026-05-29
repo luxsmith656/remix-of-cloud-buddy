@@ -31,6 +31,8 @@ const Login = () => {
     }
     setLoading(true);
     try {
+    setLoading(true);
+    try {
       if (isSignUp) {
         const { error } = await signup(email, password, username);
         if (error) { setError(error); return; }
@@ -45,8 +47,23 @@ const Login = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen flex">
+  const quickLogin = async (role: "admin" | "user") => {
+    const creds = role === "admin"
+      ? { email: "admin@gmail.com", password: "admin123" }
+      : { email: "user@gmail.com", password: "user123" };
+    setEmail(creds.email);
+    setPassword(creds.password);
+    setError("");
+    setLoading(true);
+    try {
+      const { error } = await login(creds.email, creds.password);
+      if (error) { setError(error); return; }
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
+
       {/* Left Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-center items-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent via-accent to-secondary/30" />
