@@ -125,6 +125,21 @@ const Login = () => {
             </Button>
           </form>
 
+          {!isSignUp && (
+            <div className="space-y-2">
+              <p className="text-xs text-center text-muted-foreground uppercase tracking-wider">Quick login (demo)</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" disabled={loading} onClick={() => quickLogin("admin")} className="h-10">
+                  Admin
+                </Button>
+                <Button type="button" variant="outline" disabled={loading} onClick={() => quickLogin("user")} className="h-10">
+                  User
+                </Button>
+              </div>
+            </div>
+          )}
+
+
           <div className="text-center">
             <button
               type="button"
