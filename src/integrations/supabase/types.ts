@@ -700,15 +700,25 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["product_status"]
       }
-      create_inventory_alert: {
-        Args: {
-          alert_type_value: Database["public"]["Enums"]["alert_type"]
-          item_name_value: string
-          message_value: string
-          urgent_value?: boolean
-        }
-        Returns: undefined
-      }
+      create_inventory_alert:
+        | {
+            Args: {
+              alert_type_value: Database["public"]["Enums"]["alert_type"]
+              item_name_value: string
+              message_value: string
+              urgent_value?: boolean
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              alert_type_value: string
+              item_name_value: string
+              message_value: string
+              urgent_value?: boolean
+            }
+            Returns: undefined
+          }
       delete_recipe: { Args: { recipe_id_value: string }; Returns: undefined }
       dispatch_product: {
         Args: {
