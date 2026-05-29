@@ -189,6 +189,22 @@ const BarcodeScanner = () => {
       return;
     }
     try {
+      // Explicitly request camera permission inside the user-gesture handler
+      // so the browser shows the permission prompt (some PWAs/iframes silently
+      // report "denied" if getUserMedia is wrapped too deep in a library call).
+      try {
+        const probe = await navigator.mediaDevices.getUserMedia({
+          video: deviceId
+            ? { deviceId: { exact: deviceId } }
+            : { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        // Release the probe stream; zxing will re-acquire with full constraints.
+        probe.getTracks().forEach((t) => t.stop());
+      } catch (permErr: any) {
+        throw permErr;
+      }
+
       if (!readerRef.current) {
         const hints = new Map();
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -211,6 +227,7 @@ const BarcodeScanner = () => {
       scanTimeoutRef.current = window.setTimeout(() => {
         if (status !== "checking" && controlsRef.current) setStatus("unreadable");
       }, 10_000);
+
       const controls = await readerRef.current.decodeFromConstraints(constraints, video, (result, err, ctrl) => {
         if (result) {
           try { ctrl.stop(); } catch { /* noop */ }
