@@ -40,6 +40,11 @@ const dispatchTypes = [
   { value: "other", label: "Other" },
 ];
 
+const isMissingAlertFunctionError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.includes("create_inventory_alert") && message.includes("does not exist");
+};
+
 const Dispatch = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -122,7 +127,102 @@ const Dispatch = () => {
         return { offline: true };
       }
       const { error } = await supabase.rpc("dispatch_product", payload as any);
-      if (error) throw error;
+      if (!error) return;
+      if (!isMissingAlertFunctionError(error)) throw error;
+
+      const nextProductQuantity = (selectedProduct?.quantity ?? 0) - form.quantity;
+      const batchCode = selectedBatch?.batch_code ?? null;
+
+      if (selectedBatch) {
+        const { error: batchError } = await supabase
+          .from("batches")
+          .update({ quantity_produced: selectedBatch.quantity_produced - form.quantity } as any)
+          .eq("id", selectedBatch.id);
+        if (batchError) throw batchError;
+      }
+
+      const { data: dispatch, error: dispatchError } = await supabase
+        .from("product_dispatches")
+        .insert({
+          product_id: form.product_id,
+          batch_id: form.batch_id === NO_BATCH ? null : form.batch_id,
+          dispatch_type: form.dispatch_type,
+          destination: form.destination.trim() || null,
+          reference_number: form.reference_number.trim() || null,
+          quantity: form.quantity,
+          unit_price: form.unit_price || null,
+          dispatched_date: form.dispatched_date || today(),
+          notes: form.notes.trim() || null,
+        } as any)
+        .select("id")
+        .single();
+      if (dispatchError) throw dispatchError;
+
+      const { error: productError } = await supabase
+        .from("products")
+        .update({
+          quantity: nextProductQuantity,
+          unit_price: form.unit_price || selectedProduct?.unit_price || 0,
+        } as any)
+        .eq("id", form.product_id);
+      if (productError) throw productError;
+
+      const remarks = `Dispatched product${batchCode ? ` / batch ${batchCode}` : ""}${form.reference_number.trim() ? ` / ref ${form.reference_number.trim()}` : ""}${form.destination.trim() ? ` / to ${form.destination.trim()}` : ""}`;
+
+      const { error: movementError } = await supabase.from("stock_movements").insert({
+        type: "OUT",
+        item_type: "product",
+        item_id: form.product_id,
+        item_name: selectedProduct?.name || "Product",
+        quantity: -form.quantity,
+        remarks,
+        batch_id: form.batch_id === NO_BATCH ? null : form.batch_id,
+        batch_code: batchCode,
+      } as any);
+      if (movementError) throw movementError;
+
+      const { error: activityError } = await supabase.from("inventory_activity").insert({
+        item_type: "product",
+        item_id: form.product_id,
+        item_name: selectedProduct?.name || "Product",
+        activity_type: "DISPATCH",
+        quantity: -form.quantity,
+        reference_table: "product_dispatches",
+        reference_id: dispatch?.id,
+        details: `Dispatched ${form.quantity} units${batchCode ? ` from batch ${batchCode}` : ""}`,
+      } as any);
+      if (activityError) throw activityError;
+
+      if (selectedProduct && nextProductQuantity <= selectedProduct.min_stock) {
+        const message = `${selectedProduct.name} is at or below minimum stock after dispatch.`;
+        const { data: existingAlert, error: existingAlertError } = await supabase
+          .from("alerts")
+          .select("id")
+          .eq("resolved", false)
+          .eq("message", message)
+          .eq("item_name", selectedProduct.name)
+          .maybeSingle();
+        if (existingAlertError) throw existingAlertError;
+        if (!existingAlert) {
+          const { error: alertError } = await supabase.from("alerts").insert({
+            type: nextProductQuantity <= 0 ? "critical" : "low-stock",
+            message,
+            item_name: selectedProduct.name,
+            urgent: nextProductQuantity <= 0,
+            resolved: false,
+          } as any);
+          if (alertError) throw alertError;
+        }
+      }
+
+      const { error: auditError } = await supabase.from("audit_logs").insert({
+        action: "DISPATCH",
+        module: "Product Dispatch",
+        details: `Dispatched ${form.quantity} units of ${selectedProduct?.name || "Product"}${batchCode ? ` from batch ${batchCode}` : ""}`,
+      } as any);
+      if (auditError) throw auditError;
+
+      return { fallback: true };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["product_dispatches"] });
