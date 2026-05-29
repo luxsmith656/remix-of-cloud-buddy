@@ -378,7 +378,7 @@ const BarcodeScanner = () => {
                   <Info label="Product" value={batch.product_name} />
                   <Info label="Category" value={batch.category} />
                   <Info label="Variant" value={batch.variant || "-"} />
-                  <Info label="Price / SRP" value={batch.price ? batch.price.toLocaleString(undefined, { style: "currency", currency: "PHP" }) : "-"} />
+                  {/* Price / SRP hidden per UI policy */}
                   <Info label="Manufactured" value={batch.manufactured_date} />
                   <Info label="Expiration" value={batch.expiration_date} />
                   <Info label="Shelf Life" value={batch.shelf_life ? `${batch.shelf_life} days` : "-"} />

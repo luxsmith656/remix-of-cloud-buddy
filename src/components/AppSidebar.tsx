@@ -30,7 +30,6 @@ const navItems = [
   { title: "Activity", url: "/activity", icon: History },
   { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Reports", url: "/reports", icon: BarChart3 },
-  { title: "Finance Logs", url: "/audit-logs", icon: ClipboardList },
   { title: "Roles", url: "/roles", icon: UserCog },
 ];
 

@@ -176,7 +176,7 @@ const Ingredients = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Name", "Unit", "Current Stock", "Min Stock", "Unit Cost", "Supplier", "Expiration", "Status", "Actions"].map(h => (
+                  {["Name", "Unit", "Current Stock", "Min Stock", "Supplier", "Expiration", "Status", "Actions"].map(h => (
                     <th key={h} className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -194,7 +194,6 @@ const Ingredients = () => {
                       <td className="p-4 text-sm text-muted-foreground">{i.unit}</td>
                       <td className="p-4 text-sm font-medium text-foreground">{i.current_stock}</td>
                       <td className="p-4 text-sm text-muted-foreground">{i.min_stock}</td>
-                      <td className="p-4 text-sm text-muted-foreground">{i.unit_cost ? i.unit_cost.toLocaleString(undefined, { style: "currency", currency: "PHP" }) : "-"}</td>
                       <td className="p-4 text-sm text-muted-foreground">{supplier?.name || "-"}</td>
                       <td className="p-4 text-sm text-muted-foreground">{i.expiration_date || "-"}</td>
                       <td className="p-4">
@@ -239,13 +238,13 @@ const Ingredients = () => {
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Current Stock</Label>
                 <Input type="number" min="0" value={form.current_stock} onChange={(e) => setForm({ ...form, current_stock: Math.max(0, Number(e.target.value)) })} />
               </div>
+                <div className="hidden space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unit Cost</Label>
+                  <Input type="number" min="0" step="0.01" value={form.unit_cost} onChange={(e) => setForm({ ...form, unit_cost: Math.max(0, Number(e.target.value)) })} />
+                </div>
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Min Stock</Label>
                 <Input type="number" min="0" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: Math.max(0, Number(e.target.value)) })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unit Cost</Label>
-                <Input type="number" min="0" step="0.01" value={form.unit_cost} onChange={(e) => setForm({ ...form, unit_cost: Math.max(0, Number(e.target.value)) })} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Supplier</Label>

@@ -24,7 +24,6 @@ const BarcodeScanner = lazy(() => import("./pages/BarcodeScanner"));
 const BarcodePrinting = lazy(() => import("./pages/BarcodePrinting"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const Reports = lazy(() => import("./pages/Reports"));
-const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -67,7 +66,6 @@ function AppRoutes() {
         <Route path="/barcode-printing" element={<ProtectedRoute><BarcodePrinting /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-        <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
         <Route path="/roles" element={<ProtectedRoute adminOnly><RoleManagement /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

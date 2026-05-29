@@ -1,8 +1,12 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { readWithOfflineCache } from "@/lib/offlineStore";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Profile = Tables<"profiles">;
 
 const actionColors: Record<string, string> = {
   CREATE: "bg-success/10 text-success",
@@ -12,7 +16,7 @@ const actionColors: Record<string, string> = {
 };
 
 const AuditLogs = () => {
-  const { data: logs = [], isLoading } = useQuery({
+  const { data: logs = [], isLoading: logsLoading } = useQuery({
     queryKey: ["audit_logs"],
     queryFn: async () => {
       return readWithOfflineCache("audit_logs", async () => {
@@ -23,6 +27,28 @@ const AuditLogs = () => {
     },
   });
 
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      return readWithOfflineCache("profiles", async () => {
+        const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      });
+    },
+  });
+
+  const profilesByUserId = useMemo(
+    () => new Map(profiles.map((profile: Profile) => [profile.user_id, profile])),
+    [profiles],
+  );
+
+  const getUserLabel = (log: any) => {
+    if (log.user_name) return log.user_name;
+    const profile = log.user_id ? profilesByUserId.get(log.user_id) : undefined;
+    return profile?.full_name || profile?.username || "System";
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -31,7 +57,7 @@ const AuditLogs = () => {
       </div>
       <Card>
         <CardContent className="p-0 overflow-x-auto">
-          {isLoading ? <div className="p-8 text-center text-muted-foreground">Loading...</div> : logs.length === 0 ? (
+          {logsLoading ? <div className="p-8 text-center text-muted-foreground">Loading...</div> : logs.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">No audit logs yet.</div>
           ) : (
             <table className="w-full">
@@ -43,9 +69,9 @@ const AuditLogs = () => {
                 </tr>
               </thead>
               <tbody>
-                {logs.map(l => (
+                {logs.map((l: any) => (
                   <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-sm text-foreground">{l.user_name || "System"}</td>
+                    <td className="p-4 text-sm text-foreground">{getUserLabel(l)}</td>
                     <td className="p-4"><span className={`text-xs font-medium px-2 py-1 rounded-full ${actionColors[l.action] || ""}`}>{l.action}</span></td>
                     <td className="p-4 text-sm text-muted-foreground">{l.module}</td>
                     <td className="p-4 text-sm text-muted-foreground max-w-xs truncate">

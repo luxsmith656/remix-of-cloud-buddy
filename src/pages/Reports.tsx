@@ -91,8 +91,8 @@ const Reports = () => {
 
   const generateInventory = (format: "csv" | "pdf") => {
     const rows = [
-      ...products.map(p => ({ Type: "Product", Name: p.name, Barcode: p.barcode || "-", Variant: p.variant || "-", Stock: p.quantity, "Min Stock": p.min_stock, Unit: "units", "Unit Price": p.unit_price, "Est. Unit Cost": p.estimated_unit_cost, Status: computeProductStatus(p.quantity, p.min_stock, p.expiration_date), Expiration: p.expiration_date || "-" })),
-      ...ingredients.map(i => ({ Type: "Ingredient", Name: i.name, Variant: "-", Stock: i.current_stock, "Min Stock": i.min_stock, Unit: i.unit, "Unit Price": "-", "Est. Unit Cost": i.unit_cost, Status: i.current_stock <= i.min_stock ? "low-stock" : "ok", Expiration: i.expiration_date || "-" })),
+      ...products.map(p => ({ Type: "Product", Name: p.name, Barcode: p.barcode || "-", Variant: p.variant || "-", Stock: p.quantity, "Min Stock": p.min_stock, Unit: "units", Status: computeProductStatus(p.quantity, p.min_stock, p.expiration_date), Expiration: p.expiration_date || "-" })),
+      ...ingredients.map(i => ({ Type: "Ingredient", Name: i.name, Variant: "-", Stock: i.current_stock, "Min Stock": i.min_stock, Unit: i.unit, Status: i.current_stock <= i.min_stock ? "low-stock" : "ok", Expiration: i.expiration_date || "-" })),
     ];
     if (format === "csv") downloadCSV(rows, "inventory_summary.csv");
     else downloadPDF("Inventory Summary Report", rows);
@@ -100,10 +100,10 @@ const Reports = () => {
 
   const generateBatchReport = (format: "csv" | "pdf") => {
     const filtered = filterByDate(batches);
-    const rows = filtered.map((b: any) => ({
+      const rows = filtered.map((b: any) => ({
       "Batch Barcode": b.batch_code || b.id.slice(0, 8), Product: b.products?.name || "-", Variant: b.products?.variant || "-",
       Planned: b.quantity_planned, Remaining: b.quantity_produced, Status: b.status,
-      "Manufactured Date": b.manufactured_date || b.production_date, "Expiration Date": b.expiration_date || "-", Price: b.price || 0,
+      "Manufactured Date": b.manufactured_date || b.production_date, "Expiration Date": b.expiration_date || "-",
     }));
     if (format === "csv") downloadCSV(rows, "batch_production.csv");
     else downloadPDF("Batch Production Report", rows);
@@ -131,15 +131,13 @@ const Reports = () => {
 
   const generateReceivingReport = (format: "csv" | "pdf") => {
     const filtered = filterByDate(receipts);
-    const rows = filtered.map((receipt: any) => ({
+      const rows = filtered.map((receipt: any) => ({
       Ingredient: receipt.ingredients?.name || "-",
       Quantity: receipt.quantity,
       Unit: receipt.ingredients?.unit || "-",
       Supplier: receipt.suppliers?.name || "-",
       Lot: receipt.lot_number || "-",
       Invoice: receipt.invoice_number || "-",
-      "Unit Cost": receipt.unit_cost || 0,
-      "Total Cost": receipt.total_cost || 0,
       Received: receipt.received_date,
       Expiration: receipt.expiration_date || "-",
     }));
@@ -149,15 +147,13 @@ const Reports = () => {
 
   const generateDispatchReport = (format: "csv" | "pdf") => {
     const filtered = filterByDate(dispatches);
-    const rows = filtered.map((dispatch: any) => ({
+      const rows = filtered.map((dispatch: any) => ({
       Product: `${dispatch.products?.name || "-"}${dispatch.products?.variant ? ` (${dispatch.products.variant})` : ""}`,
       "Batch Barcode": dispatch.batches?.batch_code || "-",
       Quantity: dispatch.quantity,
       Type: dispatch.dispatch_type,
       Destination: dispatch.destination || "-",
       Reference: dispatch.reference_number || "-",
-      "Unit Price": dispatch.unit_price || 0,
-      "Total Value": dispatch.total_value || 0,
       Dispatched: dispatch.dispatched_date,
     }));
     if (format === "csv") downloadCSV(rows, "product_dispatches.csv");

@@ -22,7 +22,7 @@ const BarcodePrinting = () => {
   const [labelSize, setLabelSize] = useState("large");
   const [showProduct, setShowProduct] = useState(true);
   const [showExpiry, setShowExpiry] = useState(true);
-  const [showPrice, setShowPrice] = useState(true);
+  const [showPrice, setShowPrice] = useState(false);
   const [showManufactured, setShowManufactured] = useState(true);
 
   const { data: products = [] } = useQuery({
@@ -132,7 +132,7 @@ const BarcodePrinting = () => {
           <div className="flex flex-wrap gap-4 md:col-span-4">
             <Toggle label="Product" checked={showProduct} onChange={setShowProduct} />
             <Toggle label="Expiry" checked={showExpiry} onChange={setShowExpiry} />
-            <Toggle label="Price" checked={showPrice} onChange={setShowPrice} />
+            {/* Price toggle hidden by default */}
             <Toggle label="Manufactured" checked={showManufactured} onChange={setShowManufactured} />
           </div>
         </CardContent>

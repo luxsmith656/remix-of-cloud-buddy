@@ -173,7 +173,7 @@ const Dispatch = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Product", "Qty", "Type", "Destination", "Reference", "Unit Price", "Total", "Dispatched", "Batch Barcode"].map((header) => (
+                  {"Product", "Qty", "Type", "Destination", "Reference", "Dispatched", "Batch Barcode"}.map((header) => (
                     <th key={header} className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{header}</th>
                   ))}
                 </tr>
@@ -188,8 +188,6 @@ const Dispatch = () => {
                     <td className="p-4 text-sm text-muted-foreground capitalize">{dispatch.dispatch_type}</td>
                     <td className="p-4 text-sm text-muted-foreground">{dispatch.destination || "-"}</td>
                     <td className="p-4 text-sm text-muted-foreground">{dispatch.reference_number || "-"}</td>
-                    <td className="p-4 text-sm text-muted-foreground">{dispatch.unit_price ? dispatch.unit_price.toLocaleString(undefined, { style: "currency", currency: "PHP" }) : "-"}</td>
-                    <td className="p-4 text-sm font-medium text-foreground">{dispatch.total_value ? dispatch.total_value.toLocaleString(undefined, { style: "currency", currency: "PHP" }) : "-"}</td>
                     <td className="p-4 text-sm text-muted-foreground">{new Date(dispatch.dispatched_date).toLocaleDateString()}</td>
                     <td className="p-4 text-sm text-muted-foreground">{dispatch.batches?.batch_code || "-"}</td>
                   </tr>
@@ -282,10 +280,6 @@ const Dispatch = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground">Quantity *</Label>
                       <Input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(idx, { quantity: Math.max(1, Number(e.target.value)) })} />
-                    </div>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unit Price</Label>
-                      <Input type="number" min="0" step="0.01" value={line.unit_price} onChange={(e) => updateLine(idx, { unit_price: Math.max(0, Number(e.target.value)) })} />
                     </div>
                   </div>
                 </div>

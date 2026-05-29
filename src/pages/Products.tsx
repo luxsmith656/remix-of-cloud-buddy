@@ -267,7 +267,6 @@ const Products = () => {
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Batch</th>
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</th>
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
-                    <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Price</th>
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expiration Date</th>
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
@@ -325,7 +324,6 @@ const Products = () => {
                         </td>
                         <td className="p-4"><Badge variant="outline" className="text-xs font-normal">{p.category}</Badge></td>
                         <td className="p-4 text-sm font-medium text-foreground">{displayQuantity} Units</td>
-                        <td className="p-4 text-sm text-muted-foreground">{p.unit_price ? p.unit_price.toLocaleString(undefined, { style: "currency", currency: "PHP" }) : "-"}</td>
                         <td className="p-4 text-sm text-muted-foreground">{displayExpiration ? new Date(displayExpiration).toLocaleDateString() : "-"}</td>
                         <td className="p-4">
                           <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${statusStyles[computedStatus]}`}>
@@ -385,11 +383,11 @@ const Products = () => {
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Min Stock</Label>
                 <Input type="number" min="0" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: Math.max(0, Number(e.target.value)) })} />
               </div>
-              <div className="space-y-1.5">
+              <div className="hidden space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unit Price</Label>
                 <Input type="number" min="0" step="0.01" value={form.unit_price} onChange={(e) => setForm({ ...form, unit_price: Math.max(0, Number(e.target.value)) })} />
               </div>
-              <div className="space-y-1.5">
+              <div className="hidden space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Estimated Unit Cost</Label>
                 <Input type="number" min="0" step="0.01" value={form.estimated_unit_cost} onChange={(e) => setForm({ ...form, estimated_unit_cost: Math.max(0, Number(e.target.value)) })} />
               </div>
