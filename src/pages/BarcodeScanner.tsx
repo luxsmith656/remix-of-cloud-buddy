@@ -12,10 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { normalizeBarcodeToken } from "@/lib/barcode";
 import { cacheBatch, cacheBatches, getCachedBatch, getMeta } from "@/lib/offlineCache";
 
-type ScanStatus = "ready" | "scanning" | "checking" | "found" | "not-found" | "unreadable" | "expired" | "near-expiry" | "defective" | "no-camera-permission" | "database-error";
+type ScanStatus = "ready" | "requesting-camera" | "scanning" | "checking" | "found" | "not-found" | "unreadable" | "expired" | "near-expiry" | "defective" | "no-camera-permission" | "database-error";
 
 const statusLabels: Record<ScanStatus, string> = {
   ready: "Ready to scan",
+  "requesting-camera": "Allow camera access when prompted",
   scanning: "Scanning... hold barcode inside the box",
   checking: "Barcode detected, checking batch...",
   found: "Batch found",
@@ -70,6 +71,7 @@ const BarcodeScanner = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const scanTimeoutRef = useRef<number | null>(null);
   const lastScannedRef = useRef<{ value: string; at: number } | null>(null);
   const [fromCache, setFromCache] = useState(false);
@@ -148,18 +150,25 @@ const BarcodeScanner = () => {
     },
   });
 
+  const stopActiveStream = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  };
+
   const stopCamera = () => {
     if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
     scanTimeoutRef.current = null;
     try { controlsRef.current?.stop(); } catch { /* noop */ }
     controlsRef.current = null;
+    stopActiveStream();
     setTorchOn(false);
     setTorchSupported(false);
     setStatus(batch ? getBatchStatus(batch) : "ready");
   };
 
   const updateTorchSupport = () => {
-    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const stream = cameraStreamRef.current ?? (videoRef.current?.srcObject as MediaStream | null);
     const track = stream?.getVideoTracks()[0];
     const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
     setTorchSupported(Boolean(capabilities?.torch));
