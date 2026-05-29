@@ -26,10 +26,10 @@ const AuditLogs = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="font-heading text-3xl font-bold text-foreground">Audit Logs</h1>
-        <p className="text-muted-foreground mt-1">Complete history of all system actions.</p>
+      <div>
+        <h1 className="font-heading text-3xl font-bold text-foreground">Finance Logs</h1>
+        <p className="text-muted-foreground mt-1">Complete history of all system actions and financial events.</p>
       </div>
-      <Card>
         <CardContent className="p-0 overflow-x-auto">
           {isLoading ? <div className="p-8 text-center text-muted-foreground">Loading...</div> : logs.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">No audit logs yet.</div>
