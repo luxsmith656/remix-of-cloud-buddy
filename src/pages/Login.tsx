@@ -45,8 +45,26 @@ const Login = () => {
     }
   };
 
+  const quickLogin = async (role: "admin" | "user") => {
+    const creds = role === "admin"
+      ? { email: "admin@gmail.com", password: "admin123" }
+      : { email: "user@gmail.com", password: "user123" };
+    setEmail(creds.email);
+    setPassword(creds.password);
+    setError("");
+    setLoading(true);
+    try {
+      const { error } = await login(creds.email, creds.password);
+      if (error) { setError(error); return; }
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex">
+
       {/* Left Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-center items-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent via-accent to-secondary/30" />
@@ -106,6 +124,21 @@ const Login = () => {
               {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"} <ArrowRight size={18} />
             </Button>
           </form>
+
+          {!isSignUp && (
+            <div className="space-y-2">
+              <p className="text-xs text-center text-muted-foreground uppercase tracking-wider">Quick login (demo)</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" disabled={loading} onClick={() => quickLogin("admin")} className="h-10">
+                  Admin
+                </Button>
+                <Button type="button" variant="outline" disabled={loading} onClick={() => quickLogin("user")} className="h-10">
+                  User
+                </Button>
+              </div>
+            </div>
+          )}
+
 
           <div className="text-center">
             <button
