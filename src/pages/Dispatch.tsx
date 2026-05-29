@@ -146,7 +146,6 @@ const Dispatch = () => {
           reference_number: form.reference_number.trim() || null,
           quantity: form.quantity,
           unit_price: form.unit_price || null,
-          total_value: form.unit_price ? form.quantity * form.unit_price : null,
           dispatched_date: form.dispatched_date || today(),
           notes: form.notes.trim() || null,
         } as any)
