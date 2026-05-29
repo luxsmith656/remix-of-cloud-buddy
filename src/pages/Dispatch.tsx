@@ -40,10 +40,8 @@ const dispatchTypes = [
   { value: "other", label: "Other" },
 ];
 
-const isMissingAlertFunctionError = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error || "");
-  return message.includes("create_inventory_alert") && message.includes("does not exist");
-};
+const buildDispatchRemarks = (batchCode: string | null, referenceNumber: string, destination: string) =>
+  `Dispatched product${batchCode ? ` / batch ${batchCode}` : ""}${referenceNumber.trim() ? ` / ref ${referenceNumber.trim()}` : ""}${destination.trim() ? ` / to ${destination.trim()}` : ""}`;
 
 const Dispatch = () => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -126,9 +124,6 @@ const Dispatch = () => {
         await queueSyncAction({ module: "Dispatch", actionType: "rpc", rpcName: "dispatch_product", payload });
         return { offline: true };
       }
-      const { error } = await supabase.rpc("dispatch_product", payload as any);
-      if (!error) return;
-      if (!isMissingAlertFunctionError(error)) throw error;
 
       const nextProductQuantity = (selectedProduct?.quantity ?? 0) - form.quantity;
       const batchCode = selectedBatch?.batch_code ?? null;
@@ -151,6 +146,7 @@ const Dispatch = () => {
           reference_number: form.reference_number.trim() || null,
           quantity: form.quantity,
           unit_price: form.unit_price || null,
+          total_value: form.unit_price ? form.quantity * form.unit_price : null,
           dispatched_date: form.dispatched_date || today(),
           notes: form.notes.trim() || null,
         } as any)
@@ -167,7 +163,7 @@ const Dispatch = () => {
         .eq("id", form.product_id);
       if (productError) throw productError;
 
-      const remarks = `Dispatched product${batchCode ? ` / batch ${batchCode}` : ""}${form.reference_number.trim() ? ` / ref ${form.reference_number.trim()}` : ""}${form.destination.trim() ? ` / to ${form.destination.trim()}` : ""}`;
+      const remarks = buildDispatchRemarks(batchCode, form.reference_number, form.destination);
 
       const { error: movementError } = await supabase.from("stock_movements").insert({
         type: "OUT",
