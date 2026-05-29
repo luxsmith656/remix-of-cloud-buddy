@@ -262,10 +262,11 @@ const BarcodeScanner = () => {
         setDevices(list);
       } catch { /* noop */ }
     } catch (err: any) {
+      stopActiveStream();
       const name = err?.name || "";
       if (name === "NotAllowedError" || name === "SecurityError") {
         setStatus("no-camera-permission");
-        toast.error("Camera permission denied. Allow camera access in browser settings.");
+        toast.error("Camera is blocked. Tap the browser lock/site settings and allow Camera, then scan again.");
       } else if (name === "NotFoundError" || name === "OverconstrainedError") {
         toast.error("No suitable camera found on this device.");
         setStatus("ready");
@@ -280,6 +281,8 @@ const BarcodeScanner = () => {
     if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
     try { controlsRef.current?.stop(); } catch { /* noop */ }
     controlsRef.current = null;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
   }, []);
 
   useEffect(() => {
