@@ -98,7 +98,7 @@ const Receiving = () => {
         await queueSyncAction({ module: "Receiving", actionType: "rpc", rpcName: "receive_ingredient", payload });
         return { offline: true };
       }
-      const { error } = await supabase.rpc("receive_ingredient", payload);
+      const { error } = await supabase.rpc("receive_ingredient", payload as any);
       if (error) throw error;
     },
     onSuccess: (result) => {
